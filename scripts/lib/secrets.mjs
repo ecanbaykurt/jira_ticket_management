@@ -6,6 +6,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const SECRETS_PATH = path.join(ROOT, ".jane-secrets.json");
 
 const EMPTY = {
+  access: {
+    /** App password for Settings / Actions. Override with JANE_PASSWORD env. */
+    password: "MA2026",
+  },
   jira: {
     baseUrl: "",
     email: "",
@@ -44,6 +48,7 @@ export function loadSecrets() {
     return {
       ...structuredClone(EMPTY),
       ...raw,
+      access: { ...EMPTY.access, ...(raw.access || {}) },
       jira: { ...EMPTY.jira, ...(raw.jira || {}) },
       google: { ...EMPTY.google, ...(raw.google || {}) },
       schedule: { ...EMPTY.schedule, ...(raw.schedule || {}) },
@@ -58,6 +63,7 @@ export function saveSecrets(next) {
   const merged = {
     ...structuredClone(EMPTY),
     ...next,
+    access: { ...EMPTY.access, ...(next.access || {}) },
     jira: { ...EMPTY.jira, ...(next.jira || {}) },
     google: { ...EMPTY.google, ...(next.google || {}) },
     schedule: { ...EMPTY.schedule, ...(next.schedule || {}) },
@@ -67,8 +73,13 @@ export function saveSecrets(next) {
   return statusFromSecrets(merged);
 }
 
+export function getAccessPassword(s = loadSecrets()) {
+  return process.env.JANE_PASSWORD || s.access?.password || EMPTY.access.password;
+}
+
 export function statusFromSecrets(s = loadSecrets()) {
   return {
+    authRequired: true,
     jira: {
       configured: Boolean(s.jira.baseUrl && s.jira.email && s.jira.apiToken),
       baseUrl: s.jira.baseUrl || null,

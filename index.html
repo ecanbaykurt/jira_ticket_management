@@ -236,6 +236,8 @@
       </div>
     </div>
     <div class="topnav-actions">
+      <span class="pill" id="lockBadge">Locked</span>
+      <button class="btn" type="button" id="btnLock" hidden>Lock</button>
       <button class="btn" type="button" id="btnOpenDatasource">Datasource</button>
       <button class="btn" type="button" id="btnOpenActions">Actions</button>
       <button class="btn primary" type="button" id="btnOpenSettings">Settings</button>
@@ -387,6 +389,29 @@
     </p>
   </main>
 
+  <div class="modal" id="unlockModal" aria-hidden="true">
+    <div class="modal-panel" role="dialog" aria-labelledby="unlockTitle" style="width:min(420px,100%)">
+      <div class="modal-head">
+        <div>
+          <div class="eyebrow">Access</div>
+          <h2 id="unlockTitle" style="margin:4px 0 0;font-size:22px;letter-spacing:-.03em">Enter password</h2>
+        </div>
+        <button class="btn" type="button" id="btnCloseUnlock">Close</button>
+      </div>
+      <div class="modal-body">
+        <p class="muted" style="margin-top:0">Unlock Settings and Actions to manage API integrations.</p>
+        <div class="field">
+          <label for="unlockPassword">Password</label>
+          <input id="unlockPassword" type="password" autocomplete="current-password" placeholder="App password" />
+        </div>
+        <p class="muted" id="unlockError" style="color:var(--danger);display:none;margin:8px 0 0"></p>
+        <div class="modal-foot">
+          <button class="btn primary" type="button" id="btnUnlockSubmit">Unlock</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="settingsModal" aria-hidden="true">
     <div class="modal-panel" role="dialog" aria-labelledby="settingsTitle">
       <div class="modal-head">
@@ -402,6 +427,7 @@
           <button class="tab active" type="button" data-tab="jira">Jira</button>
           <button class="tab" type="button" data-tab="google">Google Sheets</button>
           <button class="tab" type="button" data-tab="schedule">Schedule</button>
+          <button class="tab" type="button" data-tab="access">Password</button>
         </div>
 
         <div class="tab-panel active" id="tab-jira">
@@ -480,6 +506,16 @@
             </div>
           </div>
           <p class="muted" style="margin:12px 0 0">Keep <code>npm run schedule</code> running on a machine, or use your OS cron to call <code>npm run sync</code> daily at 9:00. Settings timezone is written into the local secrets file for the scheduler.</p>
+        </div>
+
+        <div class="tab-panel" id="tab-access">
+          <div class="form-grid">
+            <div class="field">
+              <label for="newAppPassword">Change app password</label>
+              <input id="newAppPassword" type="password" placeholder="Leave blank to keep current" autocomplete="new-password" />
+              <div class="hint">Default password is <code>MA2026</code>. Override with env <code>JANE_PASSWORD</code> if set.</div>
+            </div>
+          </div>
         </div>
 
         <div class="modal-foot">
@@ -971,23 +1007,106 @@
     });
 
     /* ---- Settings / Datasource / Actions (local Jane API) ---- */
+    const AUTH_KEY = "jane_session_token";
+    let authToken = sessionStorage.getItem(AUTH_KEY) || "";
+    let pendingAfterUnlock = null;
+
+    function authHeaders(extra) {
+      const h = { ...(extra || {}) };
+      if (authToken) h.Authorization = `Bearer ${authToken}`;
+      return h;
+    }
+
+    function setUnlockedUI(on) {
+      const badge = document.getElementById("lockBadge");
+      const lockBtn = document.getElementById("btnLock");
+      badge.textContent = on ? "Unlocked" : "Locked";
+      badge.className = on ? "pill ok" : "pill";
+      lockBtn.hidden = !on;
+    }
+
     const api = {
       async get(path) {
-        const res = await fetch(path, { cache: "no-store" });
-        if (!res.ok) throw new Error(await res.text());
-        return res.json();
+        const res = await fetch(path, { cache: "no-store", headers: authHeaders() });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const err = new Error(data.error || res.statusText);
+          err.code = data.code;
+          err.status = res.status;
+          throw err;
+        }
+        return data;
       },
       async post(path, body) {
         const res = await fetch(path, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(body || {}),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || res.statusText);
+        if (!res.ok) {
+          const err = new Error(data.error || res.statusText);
+          err.code = data.code;
+          err.status = res.status;
+          throw err;
+        }
         return data;
       },
     };
+
+    function openUnlock(thenFn) {
+      pendingAfterUnlock = thenFn || null;
+      document.getElementById("unlockError").style.display = "none";
+      document.getElementById("unlockPassword").value = "";
+      document.getElementById("unlockModal").classList.add("open");
+      document.getElementById("unlockModal").setAttribute("aria-hidden", "false");
+      setTimeout(() => document.getElementById("unlockPassword").focus(), 50);
+    }
+    function closeUnlock() {
+      document.getElementById("unlockModal").classList.remove("open");
+      document.getElementById("unlockModal").setAttribute("aria-hidden", "true");
+    }
+
+    async function submitUnlock() {
+      const password = document.getElementById("unlockPassword").value;
+      const errEl = document.getElementById("unlockError");
+      try {
+        const res = await api.post("/api/auth/unlock", { password });
+        authToken = res.token;
+        sessionStorage.setItem(AUTH_KEY, authToken);
+        setUnlockedUI(true);
+        closeUnlock();
+        toast("Unlocked");
+        const next = pendingAfterUnlock;
+        pendingAfterUnlock = null;
+        if (typeof next === "function") next();
+      } catch (err) {
+        errEl.style.display = "block";
+        errEl.textContent = err.message || "Incorrect password";
+      }
+    }
+
+    async function ensureUnlocked(thenFn) {
+      try {
+        const st = await api.get("/api/auth/status");
+        if (st.unlocked) {
+          setUnlockedUI(true);
+          thenFn();
+          return;
+        }
+      } catch { /* offline */ }
+      setUnlockedUI(false);
+      openUnlock(thenFn);
+    }
+
+    async function lockApp() {
+      try { await api.post("/api/auth/lock", {}); } catch { /* ignore */ }
+      authToken = "";
+      sessionStorage.removeItem(AUTH_KEY);
+      setUnlockedUI(false);
+      closeSettings();
+      toast("Locked");
+    }
 
     function setActionLog(msg, isError) {
       const el = document.getElementById("actionLog");
@@ -1022,9 +1141,11 @@
     }
 
     function openSettings() {
-      document.getElementById("settingsModal").classList.add("open");
-      document.getElementById("settingsModal").setAttribute("aria-hidden", "false");
-      loadSettingsForm();
+      ensureUnlocked(() => {
+        document.getElementById("settingsModal").classList.add("open");
+        document.getElementById("settingsModal").setAttribute("aria-hidden", "false");
+        loadSettingsForm();
+      });
     }
     function closeSettings() {
       document.getElementById("settingsModal").classList.remove("open");
@@ -1090,9 +1211,13 @@
           hour: Number(document.getElementById("schedHour").value || 9),
           minute: 0,
         },
+        access: {},
       };
+      const newPass = document.getElementById("newAppPassword")?.value?.trim();
+      if (newPass) body.access.password = newPass;
       try {
         const res = await api.post("/api/settings", body);
+        if (document.getElementById("newAppPassword")) document.getElementById("newAppPassword").value = "";
         toast(res.message || "Settings saved");
         await loadSettingsForm();
         await refreshDatasourcePanel();
@@ -1104,54 +1229,73 @@
     }
 
     async function runAction(kind) {
-      setActionLog(`Running ${kind}…`);
-      try {
-        if (kind === "reload") {
-          await loadSnapshot();
-          await refreshDatasourcePanel();
-          setActionLog("Dashboard reloaded from snapshot.");
-          return;
+      const needsAuth = kind !== "reload";
+      const exec = async () => {
+        setActionLog(`Running ${kind}…`);
+        try {
+          if (kind === "reload") {
+            await loadSnapshot();
+            await refreshDatasourcePanel();
+            setActionLog("Dashboard reloaded from snapshot.");
+            return;
+          }
+          if (kind === "sync-demo") {
+            const res = await api.post("/api/actions/sync", { source: "demo", dryRun: true });
+            setActionLog(`Demo loaded · ${res.count} tickets`);
+            await loadSnapshot();
+            await refreshDatasourcePanel();
+            toast("Demo datasource loaded");
+            return;
+          }
+          if (kind === "sync-jira") {
+            const res = await api.post("/api/actions/sync", { source: "jira" });
+            setActionLog(`Jira sync OK · ${res.count} tickets · ${res.generatedAt}`);
+            await loadSnapshot();
+            await refreshDatasourcePanel();
+            toast("Jira synced");
+            return;
+          }
+          if (kind === "sync-google") {
+            const res = await api.post("/api/actions/sync", { source: "google" });
+            setActionLog(`Google sync OK · ${res.count} tickets · ${res.generatedAt}`);
+            await loadSnapshot();
+            await refreshDatasourcePanel();
+            toast("Google Sheets synced");
+            return;
+          }
+          if (kind === "test-jira" || kind === "test-google") {
+            const target = kind === "test-jira" ? "jira" : "google";
+            const res = await api.post("/api/actions/test", { target });
+            setActionLog(res.message || "OK");
+            await loadSnapshot();
+            await refreshDatasourcePanel();
+            toast(res.message || "Test OK");
+          }
+        } catch (err) {
+          if (err.status === 401 || err.code === "LOCKED") {
+            openUnlock(() => runAction(kind));
+            setActionLog("Unlock required", true);
+            return;
+          }
+          setActionLog(err.message || String(err), true);
+          toast(err.message || "Action failed");
         }
-        if (kind === "sync-demo") {
-          const res = await api.post("/api/actions/sync", { source: "demo", dryRun: true });
-          setActionLog(`Demo loaded · ${res.count} tickets`);
-          await loadSnapshot();
-          await refreshDatasourcePanel();
-          toast("Demo datasource loaded");
-          return;
-        }
-        if (kind === "sync-jira") {
-          const res = await api.post("/api/actions/sync", { source: "jira" });
-          setActionLog(`Jira sync OK · ${res.count} tickets · ${res.generatedAt}`);
-          await loadSnapshot();
-          await refreshDatasourcePanel();
-          toast("Jira synced");
-          return;
-        }
-        if (kind === "sync-google") {
-          const res = await api.post("/api/actions/sync", { source: "google" });
-          setActionLog(`Google sync OK · ${res.count} tickets · ${res.generatedAt}`);
-          await loadSnapshot();
-          await refreshDatasourcePanel();
-          toast("Google Sheets synced");
-          return;
-        }
-        if (kind === "test-jira" || kind === "test-google") {
-          const target = kind === "test-jira" ? "jira" : "google";
-          const res = await api.post("/api/actions/test", { target });
-          setActionLog(res.message || "OK");
-          await loadSnapshot();
-          await refreshDatasourcePanel();
-          toast(res.message || "Test OK");
-        }
-      } catch (err) {
-        setActionLog(err.message || String(err), true);
-        toast(err.message || "Action failed");
-      }
+      };
+      if (needsAuth) ensureUnlocked(exec);
+      else exec();
     }
 
     document.getElementById("btnOpenSettings").addEventListener("click", openSettings);
     document.getElementById("btnCloseSettings").addEventListener("click", closeSettings);
+    document.getElementById("btnCloseUnlock").addEventListener("click", closeUnlock);
+    document.getElementById("btnUnlockSubmit").addEventListener("click", submitUnlock);
+    document.getElementById("unlockPassword").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submitUnlock();
+    });
+    document.getElementById("btnLock").addEventListener("click", lockApp);
+    document.getElementById("unlockModal").addEventListener("click", (e) => {
+      if (e.target.id === "unlockModal") closeUnlock();
+    });
     document.getElementById("settingsModal").addEventListener("click", (e) => {
       if (e.target.id === "settingsModal") closeSettings();
     });
@@ -1194,6 +1338,7 @@
     setBanner();
     loadSnapshot();
     refreshDatasourcePanel();
+    api.get("/api/auth/status").then((s) => setUnlockedUI(Boolean(s.unlocked))).catch(() => setUnlockedUI(false));
   </script>
 </body>
 </html>

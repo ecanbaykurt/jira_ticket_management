@@ -1,21 +1,29 @@
 #!/usr/bin/env node
 /**
  * Local Jane app server — static UI + Settings / Datasource / Actions API.
- * Secrets stay in gitignored .jane-secrets.json (never returned to the browser in full).
+ * Settings & Actions require password unlock (default MA2026 / JANE_PASSWORD).
+ * Secrets stay in gitignored .jane-secrets.json.
  *
  *   npm start          # http://localhost:5500
- *   PORT=5502 npm start
  */
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { loadSecrets, saveSecrets, statusFromSecrets } from "./lib/secrets.mjs";
+import {
+  loadSecrets,
+  saveSecrets,
+  statusFromSecrets,
+  getAccessPassword,
+} from "./lib/secrets.mjs";
 import { runSync } from "./lib/run-sync.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const PORT = Number(process.env.PORT || 5500);
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const sessions = new Map(); // token -> expiresAt
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -51,19 +59,51 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname === "/api/health" && req.method === "GET") {
-    return json(res, 200, { ok: true, service: "jane-local", port: PORT });
+    return json(res, 200, {
+      ok: true,
+      service: "jane-local",
+      port: PORT,
+      authRequired: true,
+    });
+  }
+
+  if (url.pathname === "/api/auth/status" && req.method === "GET") {
+    return json(res, 200, { ok: true, unlocked: isAuthed(req) });
+  }
+
+  if (url.pathname === "/api/auth/unlock" && req.method === "POST") {
+    const body = await readJson(req);
+    const expected = getAccessPassword();
+    if (!body?.password || body.password !== expected) {
+      return json(res, 401, { ok: false, error: "Incorrect password" });
+    }
+    const token = crypto.randomBytes(24).toString("hex");
+    sessions.set(token, Date.now() + SESSION_TTL_MS);
+    return json(res, 200, {
+      ok: true,
+      token,
+      expiresInHours: SESSION_TTL_MS / 3600000,
+      message: "Unlocked",
+    });
+  }
+
+  if (url.pathname === "/api/auth/lock" && req.method === "POST") {
+    const token = getToken(req);
+    if (token) sessions.delete(token);
+    return json(res, 200, { ok: true, message: "Locked" });
   }
 
   if (url.pathname === "/api/settings/status" && req.method === "GET") {
-    return json(res, 200, { ok: true, status: statusFromSecrets() });
+    return json(res, 200, { ok: true, status: statusFromSecrets(), unlocked: isAuthed(req) });
   }
 
   if (url.pathname === "/api/settings" && req.method === "GET") {
-    // Return editable non-secret fields + masked status (tokens never sent back)
+    if (!requireAuth(req, res)) return;
     const s = loadSecrets();
     return json(res, 200, {
       ok: true,
       settings: {
+        access: { passwordSet: Boolean(getAccessPassword()) },
         jira: {
           baseUrl: s.jira.baseUrl,
           email: s.jira.email,
@@ -90,21 +130,26 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname === "/api/settings" && req.method === "POST") {
+    if (!requireAuth(req, res)) return;
     const body = await readJson(req);
     const current = loadSecrets();
+    const access = { ...current.access };
+    if (body.access?.password && String(body.access.password).trim()) {
+      access.password = String(body.access.password).trim();
+    }
     const jira = { ...current.jira, ...(body.jira || {}) };
     const google = { ...current.google, ...(body.google || {}) };
     const schedule = { ...current.schedule, ...(body.schedule || {}) };
 
-    // Keep existing secrets if UI sent mask placeholders
     if (!body.jira?.apiToken || body.jira.apiToken.includes("•")) jira.apiToken = current.jira.apiToken;
     if (!body.google?.apiKey || body.google.apiKey.includes("•")) google.apiKey = current.google.apiKey;
 
-    const status = saveSecrets({ jira, google, schedule });
+    const status = saveSecrets({ access, jira, google, schedule });
     return json(res, 200, { ok: true, status, message: "Settings saved locally (.jane-secrets.json)" });
   }
 
   if (url.pathname === "/api/settings/clear" && req.method === "POST") {
+    if (!requireAuth(req, res)) return;
     const body = await readJson(req);
     const current = loadSecrets();
     if (body?.target === "jira" || body?.target === "all") {
@@ -142,6 +187,7 @@ async function handleApi(req, res, url) {
     }
     return json(res, 200, {
       ok: true,
+      unlocked: isAuthed(req),
       datasources: [
         {
           id: "jira",
@@ -173,6 +219,7 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname === "/api/actions/sync" && req.method === "POST") {
+    if (!requireAuth(req, res)) return;
     const body = await readJson(req);
     const source = body?.source || "auto";
     const dryRun = Boolean(body?.dryRun);
@@ -181,6 +228,7 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname === "/api/actions/test" && req.method === "POST") {
+    if (!requireAuth(req, res)) return;
     const body = await readJson(req);
     const target = body?.target || "jira";
     const status = statusFromSecrets();
@@ -206,6 +254,32 @@ async function handleApi(req, res, url) {
   }
 
   json(res, 404, { ok: false, error: "Unknown API route" });
+}
+
+function getToken(req) {
+  const h = req.headers.authorization || "";
+  if (h.toLowerCase().startsWith("bearer ")) return h.slice(7).trim();
+  const cookie = req.headers.cookie || "";
+  const m = cookie.match(/(?:^|;\s*)jane_session=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : "";
+}
+
+function isAuthed(req) {
+  const token = getToken(req);
+  if (!token) return false;
+  const exp = sessions.get(token);
+  if (!exp) return false;
+  if (Date.now() > exp) {
+    sessions.delete(token);
+    return false;
+  }
+  return true;
+}
+
+function requireAuth(req, res) {
+  if (isAuthed(req)) return true;
+  json(res, 401, { ok: false, error: "Unlock required — enter app password", code: "LOCKED" });
+  return false;
 }
 
 function serveStatic(res, pathname) {
@@ -247,7 +321,7 @@ function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
 }
 
@@ -262,5 +336,5 @@ function json(res, status, payload) {
 
 server.listen(PORT, () => {
   console.log(`[jane] http://localhost:${PORT}`);
-  console.log(`[jane] Settings API ready — secrets → .jane-secrets.json (gitignored)`);
+  console.log(`[jane] Password gate on Settings/Actions (default MA2026 / JANE_PASSWORD)`);
 });
