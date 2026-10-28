@@ -1,0 +1,33 @@
+ticket_id,created,sprint,issue_type,category,status,work_type,team,epic,story_points,assignee,priority,title,due_date,age_days,has_email
+JIRA-2401,2025-07-08,Sprint 14,Story,Analytics,Closed,Planned,Product,BI-Platform,2,A. Chen,P2,Add funnel conversion dashboard for Q3 launch,2025-07-21,12,yes
+JIRA-2408,2025-07-09,Sprint 14,Task,Ops Support,Closed,Ad hoc,Ops,Data-Quality,0.5,M. Ortiz,P3,Fix broken CSV export for field ops weekly report,2025-07-14,5,yes
+JIRA-2415,2025-07-11,Sprint 14,Bug,Pipeline,Closed,Ad hoc,Ops,Data-Quality,1,R. Patel,P1,Null IDs in service request sync overnight,2025-07-15,4,yes
+JIRA-2422,2025-07-14,Sprint 14,Story,Reporting,Closed,Planned,Mkt,Self-Serve-BI,3,A. Chen,P2,Campaign ROI tile for marketing weekly pack,2025-07-28,14,yes
+JIRA-2430,2025-07-22,Sprint 15,Story,Analytics,Closed,Planned,Product,BI-Platform,5,S. Okonkwo,P2,Cohort retention model v1 for product reviews,2025-08-11,20,yes
+JIRA-2437,2025-07-23,Sprint 15,Task,Ops Support,Closed,Ad hoc,Ops,Field-Ops-Insights,0.25,M. Ortiz,P3,One-off neighborhood volume pull for ops stand-up,2025-07-24,1,no
+JIRA-2444,2025-07-25,Sprint 15,Bug,Pipeline,Closed,Ad hoc,Product,Data-Quality,1.5,R. Patel,P1,Duplicate tickets after webhook retry,2025-07-30,5,yes
+JIRA-2451,2025-07-28,Sprint 15,Story,Reporting,Closed,Planned,Mkt,Self-Serve-BI,2,A. Chen,P2,Sprint intake trend chart for exec pack,2025-08-11,14,yes
+JIRA-2460,2025-08-05,Sprint 16,Story,Analytics,Closed,Planned,Product,BI-Platform,3,S. Okonkwo,P2,Prioritization scorecard prototype for service backlog,2025-08-18,13,yes
+JIRA-2468,2025-08-06,Sprint 16,Task,Ops Support,Closed,Ad hoc,Ops,Field-Ops-Insights,0.5,M. Ortiz,P3,Export open vs closed counts by category,2025-08-08,2,yes
+JIRA-2475,2025-08-08,Sprint 16,Story,Reporting,Closed,Planned,Mkt,Self-Serve-BI,2,A. Chen,P3,Channel mix table for Q3 marketing review,2025-08-25,17,yes
+JIRA-2482,2025-08-12,Sprint 16,Bug,Pipeline,Closed,Ad hoc,Data,Data-Quality,1,R. Patel,P2,Timezone drift on created_at for EU tickets,2025-08-15,3,yes
+JIRA-2490,2025-08-19,Sprint 17,Story,Analytics,Closed,Planned,Product,BI-Platform,5,S. Okonkwo,P2,Ad hoc vs planned capacity view by points,2025-09-01,13,yes
+JIRA-2498,2025-08-20,Sprint 17,Task,Ops Support,Blocked,Ad hoc,Ops,Field-Ops-Insights,1,M. Ortiz,P2,Join tickets to SLA calendar — missing source access,2025-09-01,38,no
+JIRA-2505,2025-08-22,Sprint 17,Story,Reporting,Closed,Planned,Mkt,Self-Serve-BI,3,A. Chen,P2,Team workload heatmap for data ops staffing,2025-09-01,10,yes
+JIRA-2512,2025-08-26,Sprint 17,Bug,Pipeline,Closed,Ad hoc,Product,Data-Quality,0.5,R. Patel,P1,Alert storm from stale status mapping,2025-08-27,1,yes
+JIRA-2520,2025-09-02,Sprint 18,Story,Analytics,In progress,Planned,Product,BI-Platform,5,S. Okonkwo,P1,Epic routing rules from title+summary for BI board,2025-09-15,25,yes
+JIRA-2528,2025-09-03,Sprint 18,Task,Ops Support,Open,Ad hoc,Ops,Field-Ops-Insights,0.5,Unassigned,P3,Quick count of blocked tickets by team,2025-09-08,24,no
+JIRA-2535,2025-09-05,Sprint 18,Story,Reporting,In progress,Planned,Mkt,Self-Serve-BI,2,A. Chen,P2,Points-by-team breakdown for planning review,2025-09-15,22,yes
+JIRA-2542,2025-09-08,Sprint 18,Bug,Pipeline,Blocked,Ad hoc,Data,Data-Quality,1.5,R. Patel,P1,Blocked: warehouse schema change pending DBA,2025-09-15,19,yes
+JIRA-2550,2025-09-09,Sprint 18,Story,Analytics,Open,Planned,Product,BI-Platform,3,S. Okonkwo,P2,Due-date helper: sprint Monday vs quarter end,2025-09-29,18,yes
+JIRA-2558,2025-09-11,Sprint 18,Task,Ops Support,Open,Ad hoc,Ops,Field-Ops-Insights,0.25,M. Ortiz,P3,Screenshot pack for facilitator backlog board,2025-09-12,16,yes
+JIRA-2565,2025-09-16,Sprint 19,Story,Analytics,Open,Planned,Product,BI-Platform,8,S. Okonkwo,P1,Comment templates for FYI + missing-email follow-up,2025-09-29,11,yes
+JIRA-2572,2025-09-17,Sprint 19,Story,Reporting,In progress,Planned,Mkt,Self-Serve-BI,3,A. Chen,P2,Sprint intake trend with seasonal caveat callouts,2025-09-29,10,yes
+JIRA-2580,2025-09-18,Sprint 19,Task,Ops Support,Open,Ad hoc,Ops,Field-Ops-Insights,1,Unassigned,P2,Map service categories to BI epics for routing,2025-09-22,9,no
+JIRA-2587,2025-09-19,Sprint 19,Bug,Pipeline,Open,Ad hoc,Product,Data-Quality,0.5,R. Patel,P2,Status label mismatch Open vs In progress in export,2025-09-22,8,yes
+JIRA-2594,2025-09-22,Sprint 19,Story,Analytics,Open,Planned,Data Science,ML-Assist,5,S. Okonkwo,P2,Story-point estimator pilot (0.25 floor; 1pt=8h),2025-10-06,5,yes
+JIRA-2601,2025-09-23,Sprint 19,Task,Ops Support,Blocked,Ad hoc,Ops,Field-Ops-Insights,0.5,M. Ortiz,P3,Blocked: awaiting submitter email on JIRA-2580,2025-09-29,4,no
+JIRA-2608,2025-09-24,Sprint 19,Story,Reporting,Open,Planned,Mkt,Self-Serve-BI,2,A. Chen,P3,Quarter-end due date defaults for planning tickets,2025-09-30,3,yes
+JIRA-2615,2025-09-25,Sprint 19,Bug,Pipeline,Open,Ad hoc,Data,Data-Quality,1,R. Patel,P1,Blocked rows still counted as open in KPI rollup,2025-09-29,2,yes
+JIRA-2622,2025-10-01,Sprint 20,Story,Analytics,Open,Planned,Product,BI-Platform,3,Unassigned,P2,Assignee recommender using team + epic ownership,2025-10-13,0,yes
+JIRA-2629,2025-10-01,Sprint 20,Task,Ops Support,Open,Ad hoc,Ops,Field-Ops-Insights,0.25,Unassigned,P3,Ad hoc pull: tickets without epic this week,2025-10-02,0,no

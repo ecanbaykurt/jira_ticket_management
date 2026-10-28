@@ -1,0 +1,8 @@
+.env
+.jane-secrets.json
+node_modules/
+data/jira_snapshot.json
+data/morning-report.md
+data/jira_raw.json
+logs/
+*.log

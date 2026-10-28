@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jane · ClickOps backlog board</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;800&family=Space+Mono:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f4fa; --ink: #17152b; --purple: #7450e8; --lime: #d7fb52;
+      --muted: #626278; --border: #e1e0ec; --soft: #eeeaff;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Outfit, system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+    header {
+      padding: 22px 4% 14px; border-bottom: 1px solid var(--border);
+      background: rgba(248,248,253,.96); display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: end;
+    }
+    .eyebrow {
+      font-family: "Space Mono", monospace; font-size: 10px; letter-spacing: .16em;
+      text-transform: uppercase; color: var(--purple); font-weight: 700;
+    }
+    h1 { margin: 6px 0 0; font-size: clamp(24px, 3.5vw, 34px); letter-spacing: -.04em; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      border: 1px solid var(--border); background: #fff; border-radius: 999px;
+      padding: 9px 14px; font-weight: 700; font-size: 13px; text-decoration: none; color: var(--ink); cursor: pointer;
+    }
+    .btn.primary { background: var(--purple); color: #fff; border-color: var(--purple); }
+    main { padding: 18px 4% 40px; }
+    .rules {
+      background: #17152b; color: #ddd9f5; border-radius: 14px; padding: 14px 16px;
+      font-size: 13px; line-height: 1.5; margin-bottom: 16px;
+    }
+    .rules strong { color: var(--lime); }
+    .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .kpi { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+    .kpi .n { font-size: 28px; font-weight: 800; letter-spacing: -.03em; }
+    .kpi .l { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    .board {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start;
+    }
+    .col {
+      background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 12px; min-height: 280px;
+    }
+    .col h2 {
+      margin: 0 0 10px; font-size: 14px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .count {
+      font-family: "Space Mono", monospace; font-size: 11px; background: var(--soft);
+      color: var(--purple); padding: 3px 8px; border-radius: 999px;
+    }
+    .card {
+      border: 1px solid var(--border); border-radius: 12px; padding: 10px 11px; margin-bottom: 8px;
+      background: linear-gradient(180deg, #fff, #faf9ff);
+    }
+    .card.blocked { border-color: #cbb6f0; background: #f8f3ff; }
+    .id { font-family: "Space Mono", monospace; font-size: 10px; font-weight: 700; color: var(--purple); }
+    .title { font-size: 13px; font-weight: 700; margin: 4px 0 6px; line-height: 1.35; }
+    .meta { font-size: 11px; color: var(--muted); line-height: 1.45; }
+    .pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .pill {
+      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: #eceaf5;
+    }
+    .pill.p1 { background: #fdecea; color: #b42318; }
+    .pill.p2 { background: #fff4d6; color: #9a6b00; }
+    .pill.p3 { background: #eceaf5; color: #626278; }
+    .pill.adhoc { background: #efe8ff; color: #5a38c7; }
+    .note { margin-top: 14px; font-size: 12px; color: var(--muted); }
+    a { color: var(--purple); font-weight: 700; }
+    @media (max-width: 900px) {
+      .board, .kpis { grid-template-columns: 1fr; }
+    }
+    @media print {
+      .actions { display: none !important; }
+      body { background: #fff; }
+      .col, .card, .kpi { break-inside: avoid; }
+      header { border: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="eyebrow">ClickOps · Facilitator printout</div>
+      <h1>Jane backlog board · P1 / P2 / P3</h1>
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="button" onclick="window.print()">Print board</button>
+      <a class="btn" href="index.html">← Dashboard</a>
+    </div>
+  </header>
+  <main>
+    <div class="rules">
+      <strong>Triage rules (local definitions required):</strong>
+      P1 = same-day unblock / broken pipeline · P2 = sprint commitment · P3 = backlog polish.
+      Sort within column by age. Neighborhood / team fields are for routing — not surveillance.
+      Done = Closed with acceptance noted. Blocked ≠ available capacity.
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="board" id="board"></div>
+    <p class="note">
+      Fictional demo tickets for Decision Lab. Source CSV: <code>data/sample_data.csv</code>.
+      Live ops path when Next is running: <a href="/ops/service-field-operations">/ops/service-field-operations</a>.
+    </p>
+  </main>
+  <script>
+    const ACTIVE = [
+      {id:"JIRA-2520",title:"Epic routing rules from title+summary for BI board",priority:"P1",status:"In progress",team:"Product",epic:"BI-Platform",points:5,age:25,assignee:"S. Okonkwo",work:"Planned"},
+      {id:"JIRA-2542",title:"Blocked: warehouse schema change pending DBA",priority:"P1",status:"Blocked",team:"Data",epic:"Data-Quality",points:1.5,age:19,assignee:"R. Patel",work:"Ad hoc"},
+      {id:"JIRA-2565",title:"Comment templates for FYI + missing-email follow-up",priority:"P1",status:"Open",team:"Product",epic:"BI-Platform",points:8,age:11,assignee:"S. Okonkwo",work:"Planned"},
+      {id:"JIRA-2615",title:"Blocked rows still counted as open in KPI rollup",priority:"P1",status:"Open",team:"Data",epic:"Data-Quality",points:1,age:2,assignee:"R. Patel",work:"Ad hoc"},
+      {id:"JIRA-2498",title:"Join tickets to SLA calendar — missing source access",priority:"P2",status:"Blocked",team:"Ops",epic:"Field-Ops-Insights",points:1,age:38,assignee:"M. Ortiz",work:"Ad hoc"},
+      {id:"JIRA-2535",title:"Points-by-team breakdown for planning review",priority:"P2",status:"In progress",team:"Mkt",epic:"Self-Serve-BI",points:2,age:22,assignee:"A. Chen",work:"Planned"},
+      {id:"JIRA-2550",title:"Due-date helper: sprint Monday vs quarter end",priority:"P2",status:"Open",team:"Product",epic:"BI-Platform",points:3,age:18,assignee:"S. Okonkwo",work:"Planned"},
+      {id:"JIRA-2572",title:"Sprint intake trend with seasonal caveat callouts",priority:"P2",status:"In progress",team:"Mkt",epic:"Self-Serve-BI",points:3,age:10,assignee:"A. Chen",work:"Planned"},
+      {id:"JIRA-2580",title:"Map service categories to BI epics for routing",priority:"P2",status:"Open",team:"Ops",epic:"Field-Ops-Insights",points:1,age:9,assignee:"Unassigned",work:"Ad hoc"},
+      {id:"JIRA-2587",title:"Status label mismatch Open vs In progress in export",priority:"P2",status:"Open",team:"Product",epic:"Data-Quality",points:0.5,age:8,assignee:"R. Patel",work:"Ad hoc"},
+      {id:"JIRA-2594",title:"Story-point estimator pilot (0.25 floor; 1pt=8h)",priority:"P2",status:"Open",team:"Data Science",epic:"ML-Assist",points:5,age:5,assignee:"S. Okonkwo",work:"Planned"},
+      {id:"JIRA-2622",title:"Assignee recommender using team + epic ownership",priority:"P2",status:"Open",team:"Product",epic:"BI-Platform",points:3,age:0,assignee:"Unassigned",work:"Planned"},
+      {id:"JIRA-2528",title:"Quick count of blocked tickets by team",priority:"P3",status:"Open",team:"Ops",epic:"Field-Ops-Insights",points:0.5,age:24,assignee:"Unassigned",work:"Ad hoc"},
+      {id:"JIRA-2558",title:"Screenshot pack for facilitator backlog board",priority:"P3",status:"Open",team:"Ops",epic:"Field-Ops-Insights",points:0.25,age:16,assignee:"M. Ortiz",work:"Ad hoc"},
+      {id:"JIRA-2601",title:"Blocked: awaiting submitter email on JIRA-2580",priority:"P3",status:"Blocked",team:"Ops",epic:"Field-Ops-Insights",points:0.5,age:4,assignee:"M. Ortiz",work:"Ad hoc"},
+      {id:"JIRA-2608",title:"Quarter-end due date defaults for planning tickets",priority:"P3",status:"Open",team:"Mkt",epic:"Self-Serve-BI",points:2,age:3,assignee:"A. Chen",work:"Planned"},
+      {id:"JIRA-2629",title:"Ad hoc pull: tickets without epic this week",priority:"P3",status:"Open",team:"Ops",epic:"Field-Ops-Insights",points:0.25,age:0,assignee:"Unassigned",work:"Ad hoc"}
+    ];
+
+    const open = ACTIVE.filter((t) => t.status === "Open").length;
+    const blocked = ACTIVE.filter((t) => t.status === "Blocked").length;
+    const inprog = ACTIVE.filter((t) => t.status === "In progress").length;
+    const pts = ACTIVE.reduce((a, t) => a + t.points, 0);
+
+    document.getElementById("kpis").innerHTML = [
+      ["Open", open], ["In progress", inprog], ["Blocked", blocked], ["Active points", pts]
+    ].map(([l, n]) => `<div class="kpi"><div class="l">${l}</div><div class="n">${n}</div></div>`).join("");
+
+    function card(t) {
+      return `<article class="card ${t.status === "Blocked" ? "blocked" : ""}">
+        <div class="id">${t.id} · ${t.status}</div>
+        <div class="title">${t.title}</div>
+        <div class="meta">${t.team} → ${t.epic} · ${t.assignee} · ${t.age}d · ${t.points}pt</div>
+        <div class="pills">
+          <span class="pill ${t.priority.toLowerCase()}">${t.priority}</span>
+          <span class="pill ${t.work === "Ad hoc" ? "adhoc" : ""}">${t.work}</span>
+        </div>
+      </article>`;
+    }
+
+    document.getElementById("board").innerHTML = ["P1", "P2", "P3"].map((p) => {
+      const items = ACTIVE.filter((t) => t.priority === p).sort((a, b) => b.age - a.age);
+      return `<section class="col"><h2>${p}<span class="count">${items.length}</span></h2>${items.map(card).join("")}</section>`;
+    }).join("");
+  </script>
+</body>
+</html>

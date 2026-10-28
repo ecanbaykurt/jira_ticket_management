@@ -1,0 +1,1199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jane · Interactive triage summary</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Space+Mono:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f4fa; --ink: #17152b; --purple: #7450e8; --purple-deep: #5a38c7;
+      --lime: #d7fb52; --muted: #626278; --border: #e1e0ec; --soft: #eeeaff;
+      --ok: #1f7a4d; --ok-bg: #e6f6ee; --warn: #9a6b00; --warn-bg: #fff4d6;
+      --danger: #b42318; --danger-bg: #fdecea; --blocked: #6b4f9a; --blocked-bg: #f0e8ff;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Outfit, system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+    .topnav {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      padding: 12px 5%; border-bottom: 1px solid var(--border); background: #fff; position: sticky; top: 0; z-index: 30;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-mark {
+      width: 34px; height: 34px; border-radius: 10px; background: var(--purple);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,.25);
+    }
+    .brand strong { display: block; font-size: 14px; letter-spacing: -.02em; }
+    .topnav-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    header {
+      padding: 24px 5% 16px; border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(248,248,253,.98), rgba(238,234,255,.72));
+    }
+    .source-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .source-row {
+      display: flex; justify-content: space-between; gap: 10px; align-items: center;
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
+    }
+    .source-row .name { font-weight: 700; font-size: 14px; }
+    .source-row .detail { font-size: 12px; color: var(--muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .dot.on { background: #34a853; }
+    .dot.off { background: #c4c2d4; }
+    .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 12px 0; }
+    .action-log {
+      font-size: 12px; padding: 10px 12px; border-radius: 10px; background: var(--bg);
+      border: 1px solid var(--border); min-height: 42px; line-height: 1.45;
+    }
+    .modal {
+      position: fixed; inset: 0; background: rgba(23,21,43,.5); display: none; align-items: center;
+      justify-content: center; z-index: 60; padding: 16px;
+    }
+    .modal.open { display: flex; }
+    .modal-panel {
+      width: min(720px, 100%); max-height: min(90vh, 900px); overflow: auto; background: #fff;
+      border-radius: 18px; border: 1px solid var(--border); box-shadow: 0 24px 60px rgba(0,0,0,.2);
+    }
+    .modal-head {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      padding: 16px 18px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: #fff; z-index: 1;
+    }
+    .modal-body { padding: 16px 18px 22px; }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .tab {
+      border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 8px 12px;
+      font: inherit; font-weight: 700; font-size: 12px; cursor: pointer;
+    }
+    .tab.active { background: var(--purple); color: #fff; border-color: var(--purple); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .form-grid { display: grid; gap: 12px; }
+    .form-grid.two-col { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .field label { font-size: 12px; font-weight: 700; display: block; margin-bottom: 6px; }
+    .field input, .field textarea, .field select {
+      width: 100%; font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: #fff;
+    }
+    .field textarea { min-height: 70px; resize: vertical; }
+    .field .hint { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.4; }
+    .check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+    .modal-foot {
+      display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end;
+      margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+    }
+    .api-status {
+      font-size: 12px; color: var(--muted); padding: 10px 12px; border-radius: 10px;
+      background: var(--soft); border: 1px solid #ded5ff; margin-bottom: 12px; line-height: 1.45;
+    }
+    .eyebrow { font-family: "Space Mono", monospace; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--purple); font-weight: 700; }
+    h1 { margin: 8px 0 0; font-size: clamp(26px, 4vw, 38px); letter-spacing: -.04em; }
+    .sub { max-width: 70ch; margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .header-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px;
+      border: 1px solid var(--border); background: #fff; color: var(--ink); text-decoration: none;
+      font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit;
+    }
+    .btn.primary { background: var(--purple); color: #fff; border-color: var(--purple); }
+    .btn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    main { padding: 20px 5% 56px; max-width: 1180px; margin: 0 auto; }
+    .banner {
+      background: var(--soft); border: 1px solid #ded5ff; border-radius: 14px;
+      padding: 12px 14px; color: #56478e; font-size: 13px; margin-bottom: 16px; line-height: 1.5;
+    }
+    .banner.live { background: #eefbf3; border-color: #b7e4c7; color: #1f7a4d; }
+    .grid { display: grid; gap: 14px; }
+    .kpi { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-bottom: 14px; }
+    .two { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom: 14px; }
+    .card {
+      background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px;
+      transition: box-shadow .15s, border-color .15s, transform .12s;
+    }
+    .card.clickable { cursor: pointer; user-select: none; }
+    .card.clickable:hover { border-color: #c4b5f5; box-shadow: 0 8px 24px rgba(116,80,232,.12); transform: translateY(-1px); }
+    .card.clickable.active {
+      border-color: var(--purple); box-shadow: 0 0 0 2px rgba(116,80,232,.25);
+      background: linear-gradient(180deg, #fff, #f6f2ff);
+    }
+    .card h2, .card h3 { margin: 0 0 6px; font-size: 16px; letter-spacing: -.02em; }
+    .tag {
+      display: inline-block; font-family: "Space Mono", monospace; font-size: 10px;
+      letter-spacing: .12em; text-transform: uppercase; color: var(--purple); font-weight: 700; margin-bottom: 6px;
+    }
+    .muted { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .stat-value { font-size: 34px; font-weight: 800; letter-spacing: -.04em; margin: 2px 0; }
+    .stat-hint { font-size: 12px; color: var(--muted); }
+    .bar-row {
+      display: grid; grid-template-columns: 110px 1fr auto; gap: 10px;
+      align-items: center; font-size: 13px; margin: 8px 0; cursor: pointer; border-radius: 8px; padding: 4px 6px;
+    }
+    .bar-row:hover, .bar-row.active { background: var(--soft); }
+    .track { height: 10px; background: #eceaf5; border-radius: 999px; overflow: hidden; }
+    .track i { display: block; height: 100%; border-radius: 999px; background: var(--purple); }
+    .track i.planned { background: var(--purple-deep); }
+    .track i.adhoc { background: #a78bfa; }
+    .stack { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: #eceaf5; margin: 10px 0 8px; }
+    .stack span { display: block; height: 100%; cursor: pointer; }
+    .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); }
+    .legend button {
+      border: 0; background: transparent; font: inherit; color: inherit; cursor: pointer;
+      padding: 2px 4px; border-radius: 6px;
+    }
+    .legend button:hover, .legend button.active { background: var(--soft); color: var(--ink); }
+    .legend b { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+    .callout {
+      background: #f7ffe8; border: 1px solid #cfe89a; border-radius: 12px;
+      padding: 12px 14px; font-size: 13px; color: #3d4f12; margin-top: 10px; line-height: 1.5;
+    }
+    .summary-box {
+      background: #17152b; color: #f0eefc; border-radius: 18px; padding: 18px 20px; margin-bottom: 16px;
+    }
+    .summary-box h2 { margin: 0 0 8px; font-size: 18px; letter-spacing: -.02em; }
+    .summary-box p { margin: 0 0 10px; color: #c9c6e0; font-size: 14px; line-height: 1.55; }
+    .summary-box ul { margin: 0; padding-left: 18px; color: #ddd9f5; font-size: 13px; line-height: 1.55; }
+    .summary-box strong { color: var(--lime); }
+    .summary-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .filters {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px; margin: 12px 0;
+    }
+    label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; }
+    select, input {
+      font: inherit; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--border); background: #fff;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 920px; }
+    th {
+      text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border);
+      background: var(--soft); font-size: 12px; cursor: pointer; user-select: none;
+    }
+    th:hover { color: var(--purple); }
+    td { padding: 10px 8px; border-bottom: 1px solid #eceaf5; vertical-align: top; }
+    tr.row { cursor: pointer; }
+    tr.row:hover { background: #faf8ff; }
+    tr.row.selected { background: var(--soft); }
+    .mono { font-family: "Space Mono", monospace; font-size: 11px; font-weight: 700; }
+    .pill {
+      display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
+      background: #eceaf5; color: var(--ink);
+    }
+    .pill.ok { background: var(--ok-bg); color: var(--ok); }
+    .pill.warn { background: var(--warn-bg); color: var(--warn); }
+    .pill.danger { background: var(--danger-bg); color: var(--danger); }
+    .pill.blocked { background: var(--blocked-bg); color: var(--blocked); }
+    .triage { font-size: 12px; color: var(--muted); line-height: 1.45; max-width: 280px; }
+    .triage strong { color: var(--ink); }
+    .spark {
+      display: grid; grid-auto-flow: column; grid-auto-columns: minmax(36px, 1fr);
+      gap: 8px; align-items: end; height: 140px; margin-top: 12px;
+    }
+    .spark .col {
+      display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+      height: 100%; gap: 6px; cursor: pointer; border-radius: 8px; padding: 2px;
+    }
+    .spark .col:hover, .spark .col.active { background: rgba(116,80,232,.08); }
+    .spark .bar {
+      width: 100%; max-width: 42px; background: linear-gradient(180deg, #9b7ef0, var(--purple));
+      border-radius: 8px 8px 4px 4px; min-height: 4px;
+    }
+    .spark .lbl { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.2; }
+    .spark .n { font-size: 11px; font-weight: 700; }
+    .drawer {
+      position: fixed; inset: 0; background: rgba(23,21,43,.45); display: none; align-items: stretch;
+      justify-content: flex-end; z-index: 40;
+    }
+    .drawer.open { display: flex; }
+    .drawer-panel {
+      width: min(420px, 100%); background: #fff; padding: 22px; overflow: auto;
+      box-shadow: -12px 0 40px rgba(0,0,0,.15);
+    }
+    .drawer-panel h2 { margin: 0 0 8px; font-size: 20px; letter-spacing: -.03em; }
+    .drawer-meta { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 14px; }
+    .drawer-section { margin: 14px 0; padding: 12px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); }
+    .drawer-section h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--purple); }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .footer-note { margin-top: 20px; font-size: 12px; color: var(--muted); }
+    a { color: var(--purple); font-weight: 700; }
+    code { font-family: "Space Mono", monospace; font-size: 11px; }
+    .scroll { overflow-x: auto; }
+    .toast {
+      position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+      background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px;
+      font-size: 13px; font-weight: 700; display: none; z-index: 50; max-width: 90vw;
+    }
+    .toast.show { display: block; }
+    @media print {
+      .header-actions, .filters, .drawer, .toast, .summary-actions { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="topnav" aria-label="Jane primary">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <div class="eyebrow" style="margin:0">Decision Lab · Jane</div>
+        <strong>Data Team triage</strong>
+      </div>
+    </div>
+    <div class="topnav-actions">
+      <button class="btn" type="button" id="btnOpenDatasource">Datasource</button>
+      <button class="btn" type="button" id="btnOpenActions">Actions</button>
+      <button class="btn primary" type="button" id="btnOpenSettings">Settings</button>
+    </div>
+  </nav>
+
+  <header>
+    <div class="eyebrow">Interactive summary · API-connected when configured</div>
+    <h1>Triage Jira intake for the Data Team</h1>
+    <p class="sub">
+      Add Jira + Google credentials in <strong>Settings</strong>. Datasource shows what is connected;
+      Actions runs sync / morning analysis into the dashboard.
+    </p>
+    <div class="header-actions">
+      <button class="btn primary" type="button" id="btnSummarize">Summarize filtered view</button>
+      <button class="btn" type="button" id="btnReset">Reset filters</button>
+      <button class="btn" type="button" id="btnRefresh">Reload snapshot</button>
+      <a class="btn" href="backlog-board.html">Backlog board</a>
+      <a class="btn" href="data/sample_data.csv">CSV</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="banner" id="dataBanner">Loading…</div>
+
+    <div class="grid two" id="integrationPanels" style="margin-bottom:16px">
+      <section class="card" id="datasourcePanel">
+        <div class="tag">Datasource</div>
+        <h2>Connected sources</h2>
+        <p class="muted">Configure APIs in Settings, then sync from Actions.</p>
+        <div id="datasourceList" class="source-list"><div class="muted">Checking…</div></div>
+        <div class="callout" id="datasourceSnap" style="margin-top:10px">No snapshot yet.</div>
+      </section>
+      <section class="card" id="actionsPanel">
+        <div class="tag">Actions</div>
+        <h2>Sync &amp; analyze</h2>
+        <p class="muted">Runs on this machine via the local Jane server (avoids browser CORS).</p>
+        <div class="action-grid">
+          <button class="btn primary" type="button" data-action="sync-jira">Sync Jira</button>
+          <button class="btn" type="button" data-action="sync-google">Sync Google Sheets</button>
+          <button class="btn" type="button" data-action="sync-demo">Load demo data</button>
+          <button class="btn" type="button" data-action="test-jira">Test Jira</button>
+          <button class="btn" type="button" data-action="test-google">Test Google</button>
+          <button class="btn" type="button" data-action="reload">Refresh dashboard</button>
+        </div>
+        <div class="action-log muted" id="actionLog">Ready.</div>
+      </section>
+    </div>
+
+    <section class="summary-box" id="morningBrief">
+      <h2>Interactive morning brief</h2>
+      <p id="briefLead">Building summary…</p>
+      <ul id="briefBullets"></ul>
+      <div class="summary-actions">
+        <button class="btn" type="button" id="btnFocusBlocked" style="background:#2a2540;color:#fff;border-color:#3d3658">Focus blocked</button>
+        <button class="btn" type="button" id="btnFocusP1" style="background:#2a2540;color:#fff;border-color:#3d3658">Focus P1</button>
+        <button class="btn" type="button" id="btnFocusUnassigned" style="background:#2a2540;color:#fff;border-color:#3d3658">Unassigned</button>
+        <button class="btn" type="button" id="btnFocusMissingEmail" style="background:#2a2540;color:#fff;border-color:#3d3658">Missing email</button>
+        <button class="btn" type="button" id="btnCopyBrief" style="background:var(--lime);color:var(--ink);border-color:var(--lime)">Copy brief</button>
+      </div>
+    </section>
+
+    <div class="grid kpi" id="kpis"></div>
+
+    <div class="grid two">
+      <section class="card">
+        <div class="tag">Intake · click a sprint</div>
+        <h2>Tickets created by sprint</h2>
+        <p class="muted">Volume arriving — age alone can hide seasonal spikes.</p>
+        <div class="spark" id="sprintTrend"></div>
+      </section>
+      <section class="card">
+        <div class="tag">Status · click a segment</div>
+        <h2>Open vs closed vs blocked</h2>
+        <p class="muted">Define “done” before comparing. Blocked ≠ free capacity.</p>
+        <div id="statusBars"></div>
+        <div class="stack" id="statusStack"></div>
+        <div class="legend" id="statusLegend"></div>
+      </section>
+    </div>
+
+    <div class="grid two">
+      <section class="card">
+        <div class="tag">Capacity · click a mix</div>
+        <h2>Ad hoc vs planned — by points</h2>
+        <p class="muted"><strong>Recommended:</strong> points for capacity; ticket counts as interrupt check.</p>
+        <div id="mixBars"></div>
+        <div class="callout" id="mixCallout"></div>
+      </section>
+      <section class="card">
+        <div class="tag">Routing · click a team</div>
+        <h2>Load by requesting team</h2>
+        <p class="muted">Points first, tickets second.</p>
+        <div id="teamBars"></div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:14px">
+      <div class="tag">Triage queue · click a row</div>
+      <h2>Backlog sorted by priority × age</h2>
+      <p class="muted" id="queueHint">Showing needs-action tickets. Click column headers to re-sort.</p>
+      <div class="filters">
+        <label>Status
+          <select id="statusFilter">
+            <option value="active">Needs action (excl. Closed)</option>
+            <option value="All">All</option>
+            <option value="Open">Open</option>
+            <option value="In progress">In progress</option>
+            <option value="Blocked">Blocked</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </label>
+        <label>Team
+          <select id="teamFilter"><option value="All">All</option></select>
+        </label>
+        <label>Work type
+          <select id="workFilter">
+            <option value="All">All</option>
+            <option value="Ad hoc">Ad hoc</option>
+            <option value="Planned">Planned</option>
+          </select>
+        </label>
+        <label>Search
+          <input id="query" type="search" placeholder="ID, title, epic…" />
+        </label>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="id">Ticket</th>
+              <th data-sort="title">Title</th>
+              <th data-sort="team">Team</th>
+              <th data-sort="status">Status</th>
+              <th data-sort="priority">Pri</th>
+              <th data-sort="story_points">Pts</th>
+              <th data-sort="age_days">Age</th>
+              <th>Triage suggestion</th>
+            </tr>
+          </thead>
+          <tbody id="queueBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <p class="footer-note">
+      Jira morning job: <code>npm run schedule</code> (09:00) · one-shot <code>npm run sync</code> · dry-run <code>npm run sync:dry</code>.
+      Credentials only in local <code>.env</code> from <code>env.example</code>. Live snapshots stay gitignored.
+    </p>
+  </main>
+
+  <div class="modal" id="settingsModal" aria-hidden="true">
+    <div class="modal-panel" role="dialog" aria-labelledby="settingsTitle">
+      <div class="modal-head">
+        <div>
+          <div class="eyebrow">Integrations</div>
+          <h2 id="settingsTitle" style="margin:4px 0 0;font-size:22px;letter-spacing:-.03em">Settings</h2>
+        </div>
+        <button class="btn" type="button" id="btnCloseSettings">Close</button>
+      </div>
+      <div class="modal-body">
+        <div class="api-status" id="settingsStatus">Checking connection status…</div>
+        <div class="tabs" role="tablist">
+          <button class="tab active" type="button" data-tab="jira">Jira</button>
+          <button class="tab" type="button" data-tab="google">Google Sheets</button>
+          <button class="tab" type="button" data-tab="schedule">Schedule</button>
+        </div>
+
+        <div class="tab-panel active" id="tab-jira">
+          <div class="form-grid">
+            <div class="field">
+              <label for="jiraBaseUrl">Jira base URL</label>
+              <input id="jiraBaseUrl" placeholder="https://YOUR_ORG.atlassian.net" autocomplete="off" />
+              <div class="hint">Cloud site URL only — no trailing path.</div>
+            </div>
+            <div class="form-grid two-col">
+              <div class="field">
+                <label for="jiraEmail">Account email</label>
+                <input id="jiraEmail" type="email" placeholder="you@example.com" autocomplete="off" />
+              </div>
+              <div class="field">
+                <label for="jiraToken">API token</label>
+                <input id="jiraToken" type="password" placeholder="paste token (stored locally)" autocomplete="new-password" />
+                <div class="hint">Atlassian → Account → Security → API tokens. Never committed to git.</div>
+              </div>
+            </div>
+            <div class="field">
+              <label for="jiraJql">JQL</label>
+              <textarea id="jiraJql" placeholder="project = BI ORDER BY created DESC"></textarea>
+            </div>
+            <div class="form-grid two-col">
+              <div class="field">
+                <label for="jiraMax">Max results</label>
+                <input id="jiraMax" type="number" min="1" max="1000" value="200" />
+              </div>
+              <div class="field">
+                <label for="jiraPointsField">Story points field id (optional)</label>
+                <input id="jiraPointsField" placeholder="customfield_10016" />
+              </div>
+              <div class="field">
+                <label for="jiraSprintField">Sprint field id (optional)</label>
+                <input id="jiraSprintField" placeholder="customfield_10020" />
+              </div>
+              <div class="field">
+                <label for="jiraTeamField">Team field id (optional)</label>
+                <input id="jiraTeamField" placeholder="customfield_xxxxx" />
+              </div>
+            </div>
+            <label class="check"><input type="checkbox" id="jiraWriteComments" /> Allow posting suggested comments to Jira (off by default)</label>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-google">
+          <div class="form-grid">
+            <div class="field">
+              <label for="googleKey">Google API key</label>
+              <input id="googleKey" type="password" placeholder="AIza… (Sheets API enabled)" autocomplete="new-password" />
+              <div class="hint">Google Cloud → APIs → enable Sheets API → create API key. Restrict the key when you can.</div>
+            </div>
+            <div class="field">
+              <label for="googleSheetId">Spreadsheet ID</label>
+              <input id="googleSheetId" placeholder="from the sheet URL /d/SPREADSHEET_ID/edit" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="googleRange">Range</label>
+              <input id="googleRange" placeholder="Tickets!A:P" />
+              <div class="hint">Header row required. Columns like ticket_id, title, status, team, sprint, story_points…</div>
+            </div>
+            <label class="check"><input type="checkbox" id="googleEnabled" /> Prefer Google Sheets when Action = auto sync</label>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-schedule">
+          <div class="form-grid two-col">
+            <div class="field">
+              <label for="schedTz">Timezone</label>
+              <input id="schedTz" placeholder="America/New_York" />
+            </div>
+            <div class="field">
+              <label for="schedHour">Morning hour (local)</label>
+              <input id="schedHour" type="number" min="0" max="23" value="9" />
+            </div>
+          </div>
+          <p class="muted" style="margin:12px 0 0">Keep <code>npm run schedule</code> running on a machine, or use your OS cron to call <code>npm run sync</code> daily at 9:00. Settings timezone is written into the local secrets file for the scheduler.</p>
+        </div>
+
+        <div class="modal-foot">
+          <button class="btn" type="button" id="btnClearJira">Clear Jira token</button>
+          <button class="btn" type="button" id="btnClearGoogle">Clear Google key</button>
+          <button class="btn primary" type="button" id="btnSaveSettings">Save &amp; connect</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-panel" role="dialog" aria-labelledby="drawerTitle">
+      <button class="btn" type="button" id="drawerClose" style="margin-bottom:12px">Close</button>
+      <div class="eyebrow" id="drawerEyebrow">Ticket</div>
+      <h2 id="drawerTitle">—</h2>
+      <div class="drawer-meta" id="drawerMeta"></div>
+      <div class="drawer-section">
+        <h3>Decide</h3>
+        <div id="drawerDecide"></div>
+      </div>
+      <div class="drawer-section">
+        <h3>Suggested comment</h3>
+        <div id="drawerComment"></div>
+        <div class="chip-row">
+          <button class="btn primary" type="button" id="btnCopyComment">Copy comment</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const DEMO_TICKETS = [
+      {id:"JIRA-2401",created:"2025-07-08",sprint:"Sprint 14",issue_type:"Story",category:"Analytics",status:"Closed",work_type:"Planned",team:"Product",epic:"BI-Platform",story_points:2,assignee:"A. Chen",priority:"P2",title:"Add funnel conversion dashboard for Q3 launch",due_date:"2025-07-21",age_days:12,has_email:"yes"},
+      {id:"JIRA-2408",created:"2025-07-09",sprint:"Sprint 14",issue_type:"Task",category:"Ops Support",status:"Closed",work_type:"Ad hoc",team:"Ops",epic:"Data-Quality",story_points:0.5,assignee:"M. Ortiz",priority:"P3",title:"Fix broken CSV export for field ops weekly report",due_date:"2025-07-14",age_days:5,has_email:"yes"},
+      {id:"JIRA-2415",created:"2025-07-11",sprint:"Sprint 14",issue_type:"Bug",category:"Pipeline",status:"Closed",work_type:"Ad hoc",team:"Ops",epic:"Data-Quality",story_points:1,assignee:"R. Patel",priority:"P1",title:"Null IDs in service request sync overnight",due_date:"2025-07-15",age_days:4,has_email:"yes"},
+      {id:"JIRA-2422",created:"2025-07-14",sprint:"Sprint 14",issue_type:"Story",category:"Reporting",status:"Closed",work_type:"Planned",team:"Mkt",epic:"Self-Serve-BI",story_points:3,assignee:"A. Chen",priority:"P2",title:"Campaign ROI tile for marketing weekly pack",due_date:"2025-07-28",age_days:14,has_email:"yes"},
+      {id:"JIRA-2430",created:"2025-07-22",sprint:"Sprint 15",issue_type:"Story",category:"Analytics",status:"Closed",work_type:"Planned",team:"Product",epic:"BI-Platform",story_points:5,assignee:"S. Okonkwo",priority:"P2",title:"Cohort retention model v1 for product reviews",due_date:"2025-08-11",age_days:20,has_email:"yes"},
+      {id:"JIRA-2437",created:"2025-07-23",sprint:"Sprint 15",issue_type:"Task",category:"Ops Support",status:"Closed",work_type:"Ad hoc",team:"Ops",epic:"Field-Ops-Insights",story_points:0.25,assignee:"M. Ortiz",priority:"P3",title:"One-off neighborhood volume pull for ops stand-up",due_date:"2025-07-24",age_days:1,has_email:"no"},
+      {id:"JIRA-2444",created:"2025-07-25",sprint:"Sprint 15",issue_type:"Bug",category:"Pipeline",status:"Closed",work_type:"Ad hoc",team:"Product",epic:"Data-Quality",story_points:1.5,assignee:"R. Patel",priority:"P1",title:"Duplicate tickets after webhook retry",due_date:"2025-07-30",age_days:5,has_email:"yes"},
+      {id:"JIRA-2451",created:"2025-07-28",sprint:"Sprint 15",issue_type:"Story",category:"Reporting",status:"Closed",work_type:"Planned",team:"Mkt",epic:"Self-Serve-BI",story_points:2,assignee:"A. Chen",priority:"P2",title:"Sprint intake trend chart for exec pack",due_date:"2025-08-11",age_days:14,has_email:"yes"},
+      {id:"JIRA-2460",created:"2025-08-05",sprint:"Sprint 16",issue_type:"Story",category:"Analytics",status:"Closed",work_type:"Planned",team:"Product",epic:"BI-Platform",story_points:3,assignee:"S. Okonkwo",priority:"P2",title:"Prioritization scorecard prototype for service backlog",due_date:"2025-08-18",age_days:13,has_email:"yes"},
+      {id:"JIRA-2468",created:"2025-08-06",sprint:"Sprint 16",issue_type:"Task",category:"Ops Support",status:"Closed",work_type:"Ad hoc",team:"Ops",epic:"Field-Ops-Insights",story_points:0.5,assignee:"M. Ortiz",priority:"P3",title:"Export open vs closed counts by category",due_date:"2025-08-08",age_days:2,has_email:"yes"},
+      {id:"JIRA-2475",created:"2025-08-08",sprint:"Sprint 16",issue_type:"Story",category:"Reporting",status:"Closed",work_type:"Planned",team:"Mkt",epic:"Self-Serve-BI",story_points:2,assignee:"A. Chen",priority:"P3",title:"Channel mix table for Q3 marketing review",due_date:"2025-08-25",age_days:17,has_email:"yes"},
+      {id:"JIRA-2482",created:"2025-08-12",sprint:"Sprint 16",issue_type:"Bug",category:"Pipeline",status:"Closed",work_type:"Ad hoc",team:"Data",epic:"Data-Quality",story_points:1,assignee:"R. Patel",priority:"P2",title:"Timezone drift on created_at for EU tickets",due_date:"2025-08-15",age_days:3,has_email:"yes"},
+      {id:"JIRA-2490",created:"2025-08-19",sprint:"Sprint 17",issue_type:"Story",category:"Analytics",status:"Closed",work_type:"Planned",team:"Product",epic:"BI-Platform",story_points:5,assignee:"S. Okonkwo",priority:"P2",title:"Ad hoc vs planned capacity view by points",due_date:"2025-09-01",age_days:13,has_email:"yes"},
+      {id:"JIRA-2498",created:"2025-08-20",sprint:"Sprint 17",issue_type:"Task",category:"Ops Support",status:"Blocked",work_type:"Ad hoc",team:"Ops",epic:"Field-Ops-Insights",story_points:1,assignee:"M. Ortiz",priority:"P2",title:"Join tickets to SLA calendar — missing source access",due_date:"2025-09-01",age_days:38,has_email:"no"},
+      {id:"JIRA-2505",created:"2025-08-22",sprint:"Sprint 17",issue_type:"Story",category:"Reporting",status:"Closed",work_type:"Planned",team:"Mkt",epic:"Self-Serve-BI",story_points:3,assignee:"A. Chen",priority:"P2",title:"Team workload heatmap for data ops staffing",due_date:"2025-09-01",age_days:10,has_email:"yes"},
+      {id:"JIRA-2512",created:"2025-08-26",sprint:"Sprint 17",issue_type:"Bug",category:"Pipeline",status:"Closed",work_type:"Ad hoc",team:"Product",epic:"Data-Quality",story_points:0.5,assignee:"R. Patel",priority:"P1",title:"Alert storm from stale status mapping",due_date:"2025-08-27",age_days:1,has_email:"yes"},
+      {id:"JIRA-2520",created:"2025-09-02",sprint:"Sprint 18",issue_type:"Story",category:"Analytics",status:"In progress",work_type:"Planned",team:"Product",epic:"BI-Platform",story_points:5,assignee:"S. Okonkwo",priority:"P1",title:"Epic routing rules from title+summary for BI board",due_date:"2025-09-15",age_days:25,has_email:"yes"},
+      {id:"JIRA-2528",created:"2025-09-03",sprint:"Sprint 18",issue_type:"Task",category:"Ops Support",status:"Open",work_type:"Ad hoc",team:"Ops",epic:"Field-Ops-Insights",story_points:0.5,assignee:"Unassigned",priority:"P3",title:"Quick count of blocked tickets by team",due_date:"2025-09-08",age_days:24,has_email:"no"},
+      {id:"JIRA-2535",created:"2025-09-05",sprint:"Sprint 18",issue_type:"Story",category:"Reporting",status:"In progress",work_type:"Planned",team:"Mkt",epic:"Self-Serve-BI",story_points:2,assignee:"A. Chen",priority:"P2",title:"Points-by-team breakdown for planning review",due_date:"2025-09-15",age_days:22,has_email:"yes"},
+      {id:"JIRA-2542",created:"2025-09-08",sprint:"Sprint 18",issue_type:"Bug",category:"Pipeline",status:"Blocked",work_type:"Ad hoc",team:"Data",epic:"Data-Quality",story_points:1.5,assignee:"R. Patel",priority:"P1",title:"Blocked: warehouse schema change pending DBA",due_date:"2025-09-15",age_days:19,has_email:"yes"},
+      {id:"JIRA-2550",created:"2025-09-09",sprint:"Sprint 18",issue_type:"Story",category:"Analytics",status:"Open",work_type:"Planned",team:"Product",epic:"BI-Platform",story_points:3,assignee:"S. Okonkwo",priority:"P2",title:"Due-date helper: sprint Monday vs quarter end",due_date:"2025-09-29",age_days:18,has_email:"yes"},
+      {id:"JIRA-2558",created:"2025-09-11",sprint:"Sprint 18",issue_type:"Task",category:"Ops Support",status:"Open",work_type:"Ad hoc",team:"Ops",epic:"Field-Ops-Insights",story_points:0.25,assignee:"M. Ortiz",priority:"P3",title:"Screenshot pack for facilitator backlog board",due_date:"2025-09-12",age_days:16,has_email:"yes"},
+      {id:"JIRA-2565",created:"2025-09-16",sprint:"Sprint 19",issue_type:"Story",category:"Analytics",status:"Open",work_type:"Planned",team:"Product",epic:"BI-Platform",story_points:8,assignee:"S. Okonkwo",priority:"P1",title:"Comment templates for FYI + missing-email follow-up",due_date:"2025-09-29",age_days:11,has_email:"yes"},
+      {id:"JIRA-2572",created:"2025-09-17",sprint:"Sprint 19",issue_type:"Story",category:"Reporting",status:"In progress",work_type:"Planned",team:"Mkt",epic:"Self-Serve-BI",story_points:3,assignee:"A. Chen",priority:"P2",title:"Sprint intake trend with seasonal caveat callouts",due_date:"2025-09-29",age_days:10,has_email:"yes"},
+      {id:"JIRA-2580",created:"2025-09-18",sprint:"Sprint 19",issue_type:"Task",category:"Ops Support",status:"Open",work_type:"Ad hoc",team:"Ops",epic:"Field-Ops-Insights",story_points:1,assignee:"Unassigned",priority:"P2",title:"Map service categories to BI epics for routing",due_date:"2025-09-22",age_days:9,has_email:"no"},
+      {id:"JIRA-2587",created:"2025-09-19",sprint:"Sprint 19",issue_type:"Bug",category:"Pipeline",status:"Open",work_type:"Ad hoc",team:"Product",epic:"Data-Quality",story_points:0.5,assignee:"R. Patel",priority:"P2",title:"Status label mismatch Open vs In progress in export",due_date:"2025-09-22",age_days:8,has_email:"yes"},
+      {id:"JIRA-2594",created:"2025-09-22",sprint:"Sprint 19",issue_type:"Story",category:"Analytics",status:"Open",work_type:"Planned",team:"Data Science",epic:"ML-Assist",story_points:5,assignee:"S. Okonkwo",priority:"P2",title:"Story-point estimator pilot (0.25 floor; 1pt=8h)",due_date:"2025-10-06",age_days:5,has_email:"yes"},
+      {id:"JIRA-2601",created:"2025-09-23",sprint:"Sprint 19",issue_type:"Task",category:"Ops Support",status:"Blocked",work_type:"Ad hoc",team:"Ops",epic:"Field-Ops-Insights",story_points:0.5,assignee:"M. Ortiz",priority:"P3",title:"Blocked: awaiting submitter email on JIRA-2580",due_date:"2025-09-29",age_days:4,has_email:"no"},
+      {id:"JIRA-2608",created:"2025-09-24",sprint:"Sprint 19",issue_type:"Story",category:"Reporting",status:"Open",work_type:"Planned",team:"Mkt",epic:"Self-Serve-BI",story_points:2,assignee:"A. Chen",priority:"P3",title:"Quarter-end due date defaults for planning tickets",due_date:"2025-09-30",age_days:3,has_email:"yes"},
+      {id:"JIRA-2615",created:"2025-09-25",sprint:"Sprint 19",issue_type:"Bug",category:"Pipeline",status:"Open",work_type:"Ad hoc",team:"Data",epic:"Data-Quality",story_points:1,assignee:"R. Patel",priority:"P1",title:"Blocked rows still counted as open in KPI rollup",due_date:"2025-09-29",age_days:2,has_email:"yes"},
+      {id:"JIRA-2622",created:"2025-10-01",sprint:"Sprint 20",issue_type:"Story",category:"Analytics",status:"Open",work_type:"Planned",team:"Product",epic:"BI-Platform",story_points:3,assignee:"Unassigned",priority:"P2",title:"Assignee recommender using team + epic ownership",due_date:"2025-10-13",age_days:0,has_email:"yes"},
+      {id:"JIRA-2629",created:"2025-10-01",sprint:"Sprint 20",issue_type:"Task",category:"Ops Support",status:"Open",work_type:"Ad hoc",team:"Ops",epic:"Field-Ops-Insights",story_points:0.25,assignee:"Unassigned",priority:"P3",title:"Ad hoc pull: tickets without epic this week",due_date:"2025-10-02",age_days:0,has_email:"no"}
+    ];
+
+    const EPIC_OWNERS = {
+      "BI-Platform": "S. Okonkwo",
+      "Self-Serve-BI": "A. Chen",
+      "Data-Quality": "R. Patel",
+      "Field-Ops-Insights": "M. Ortiz",
+      "ML-Assist": "S. Okonkwo"
+    };
+    const P_ORDER = { P1: 0, P2: 1, P3: 2 };
+
+    const state = {
+      tickets: DEMO_TICKETS.map(enrich),
+      source: "demo",
+      generatedAt: null,
+      status: "active",
+      team: "All",
+      work: "All",
+      sprint: null,
+      priority: null,
+      unassignedOnly: false,
+      missingEmailOnly: false,
+      query: "",
+      sortKey: "priority",
+      sortDir: 1,
+      selectedId: null,
+    };
+
+    function enrich(t) {
+      const epic = t.epic || "BI-Platform";
+      const assignee = t.assignee || "Unassigned";
+      const suggested_assignee = assignee !== "Unassigned" ? assignee : (EPIC_OWNERS[epic] || "Data Team queue");
+      const suggested_comment = commentFor(t, epic, suggested_assignee);
+      return { ...t, epic, suggested_assignee, suggested_comment };
+    }
+
+    function commentFor(t, epic, assignee) {
+      if (t.suggested_comment) return t.suggested_comment;
+      if (t.has_email === "no") return "Please reply with a work email + acceptance criteria so we can assign epic & due date.";
+      if (t.status === "Blocked") return `FYI — blocked; clear dependency before ${t.due_date || "sprint-end Monday"}.`;
+      if ((t.assignee || "Unassigned") === "Unassigned") return `FYI — routing to Data Team under ${epic}; confirming points this sprint.`;
+      return `FYI — queued under ${epic}; owner ${assignee}; target ${t.due_date}.`;
+    }
+
+    function toast(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.add("show");
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => el.classList.remove("show"), 2200);
+    }
+
+    function sum(arr, fn) { return arr.reduce((a, r) => a + fn(r), 0); }
+    function fmt(n) {
+      const x = Number(n);
+      return Number.isInteger(x) ? String(x) : x.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+    }
+
+    function filtered() {
+      return state.tickets.filter((t) => {
+        if (state.status === "active" && t.status === "Closed") return false;
+        if (state.status !== "All" && state.status !== "active" && t.status !== state.status) return false;
+        if (state.team !== "All" && t.team !== state.team) return false;
+        if (state.work !== "All" && t.work_type !== state.work) return false;
+        if (state.sprint && t.sprint !== state.sprint) return false;
+        if (state.priority && t.priority !== state.priority) return false;
+        if (state.unassignedOnly && t.assignee !== "Unassigned") return false;
+        if (state.missingEmailOnly && t.has_email !== "no") return false;
+        if (!state.query) return true;
+        const q = state.query.toLowerCase();
+        return [t.id, t.title, t.epic, t.assignee, t.team, t.category].join(" ").toLowerCase().includes(q);
+      });
+    }
+
+    function sorted(rows) {
+      const key = state.sortKey;
+      const dir = state.sortDir;
+      return [...rows].sort((a, b) => {
+        if (key === "priority") {
+          const d = (P_ORDER[a.priority] - P_ORDER[b.priority]) || (b.age_days - a.age_days);
+          return d * dir;
+        }
+        let av = a[key], bv = b[key];
+        if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+        return String(av).localeCompare(String(bv)) * dir;
+      });
+    }
+
+    function buildBriefText(rows) {
+      const open = rows.filter((t) => t.status === "Open").length;
+      const blocked = rows.filter((t) => t.status === "Blocked").length;
+      const p1 = rows.filter((t) => t.priority === "P1" && t.status !== "Closed").length;
+      const unassigned = rows.filter((t) => t.assignee === "Unassigned" && t.status !== "Closed").length;
+      const missing = rows.filter((t) => t.has_email === "no" && t.status !== "Closed").length;
+      const pts = sum(rows.filter((t) => t.status !== "Closed"), (t) => t.story_points);
+      const plannedPts = sum(rows.filter((t) => t.work_type === "Planned"), (t) => t.story_points);
+      const adhocPts = sum(rows.filter((t) => t.work_type === "Ad hoc"), (t) => t.story_points);
+      const topTeam = Object.entries(rows.reduce((m, t) => {
+        m[t.team] = (m[t.team] || 0) + t.story_points; return m;
+      }, {})).sort((a, b) => b[1] - a[1])[0];
+      const lead = `Filtered view: ${rows.length} tickets · ${fmt(pts)} active points · ${open} open · ${blocked} blocked.`;
+      const bullets = [
+        `<strong>${p1} P1</strong> item(s) need same-day attention in this view.`,
+        `<strong>${unassigned} unassigned</strong> — route epic owners before stand-up.`,
+        missing ? `<strong>${missing} missing email</strong> — ask submitters before estimating.` : `All visible tickets have submitter email context.`,
+        `Capacity mix: <strong>${fmt(plannedPts)}pt planned</strong> vs <strong>${fmt(adhocPts)}pt ad hoc</strong> (prefer points over counts).`,
+        topTeam ? `Heaviest requesting team: <strong>${topTeam[0]}</strong> (${fmt(topTeam[1])}pt).` : `No team load in view.`,
+      ];
+      return { lead, bullets, plain: [lead, ...bullets.map((b) => b.replace(/<[^>]+>/g, ""))].join("\n") };
+    }
+
+    function renderBrief() {
+      const rows = filtered();
+      const { lead, bullets } = buildBriefText(rows);
+      document.getElementById("briefLead").textContent = lead;
+      document.getElementById("briefBullets").innerHTML = bullets.map((b) => `<li>${b}</li>`).join("");
+    }
+
+    function renderKpis() {
+      const all = state.tickets;
+      const cards = [
+        ["Open", all.filter((t) => t.status === "Open").length, "Waiting in queue", () => { state.status = "Open"; state.priority = null; syncControls(); }],
+        ["In progress", all.filter((t) => t.status === "In progress").length, "Actively worked", () => { state.status = "In progress"; syncControls(); }],
+        ["Blocked", all.filter((t) => t.status === "Blocked").length, "Dependency — not free capacity", () => { state.status = "Blocked"; syncControls(); }],
+        ["Closed", all.filter((t) => t.status === "Closed").length, "Done (defined before compare)", () => { state.status = "Closed"; syncControls(); }],
+        ["Active points", fmt(sum(all.filter((t) => t.status !== "Closed"), (t) => t.story_points)), "Open + in progress + blocked", () => { state.status = "active"; syncControls(); }],
+      ];
+      const root = document.getElementById("kpis");
+      root.innerHTML = cards.map(([label, value, hint], i) => {
+        const active =
+          (label === "Open" && state.status === "Open") ||
+          (label === "In progress" && state.status === "In progress") ||
+          (label === "Blocked" && state.status === "Blocked") ||
+          (label === "Closed" && state.status === "Closed") ||
+          (label === "Active points" && state.status === "active" && !state.priority);
+        return `<div class="card clickable ${active ? "active" : ""}" data-kpi="${i}" tabindex="0" role="button" aria-pressed="${active}">
+          <div class="tag">${label}</div>
+          <div class="stat-value">${value}</div>
+          <div class="stat-hint">${hint}</div>
+        </div>`;
+      }).join("");
+      root.querySelectorAll("[data-kpi]").forEach((el) => {
+        el.addEventListener("click", () => cards[Number(el.dataset.kpi)][3]());
+        el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cards[Number(el.dataset.kpi)][3](); } });
+      });
+    }
+
+    function renderSprintTrend() {
+      const order = [...new Set(state.tickets.map((t) => t.sprint))];
+      const counts = new Map();
+      state.tickets.forEach((t) => counts.set(t.sprint, (counts.get(t.sprint) || 0) + 1));
+      const max = Math.max(...order.map((s) => counts.get(s) || 0), 1);
+      document.getElementById("sprintTrend").innerHTML = order.map((s) => {
+        const n = counts.get(s) || 0;
+        const h = Math.max(8, Math.round((n / max) * 100));
+        const active = state.sprint === s ? "active" : "";
+        return `<div class="col ${active}" data-sprint="${s}" title="Filter ${s}"><div class="n">${n}</div><div class="bar" style="height:${h}%"></div><div class="lbl">${s.replace("Sprint ", "S")}</div></div>`;
+      }).join("");
+      document.querySelectorAll("[data-sprint]").forEach((el) => {
+        el.addEventListener("click", () => {
+          state.sprint = state.sprint === el.dataset.sprint ? null : el.dataset.sprint;
+          renderAll();
+          toast(state.sprint ? `Filtered to ${state.sprint}` : "Sprint filter cleared");
+        });
+      });
+    }
+
+    function renderStatus() {
+      const parts = [
+        ["Open", state.tickets.filter((t) => t.status === "Open").length, "var(--purple)"],
+        ["In progress", state.tickets.filter((t) => t.status === "In progress").length, "#e6a700"],
+        ["Blocked", state.tickets.filter((t) => t.status === "Blocked").length, "var(--blocked)"],
+        ["Closed", state.tickets.filter((t) => t.status === "Closed").length, "#34a853"],
+      ];
+      const total = sum(parts, (p) => p[1]) || 1;
+      const max = Math.max(...parts.map((p) => p[1]), 1);
+      document.getElementById("statusBars").innerHTML = parts.map(([label, n]) => {
+        const active = state.status === label ? "active" : "";
+        return `<div class="bar-row ${active}" data-status="${label}"><span>${label}</span><div class="track"><i style="width:${(n / max) * 100}%"></i></div><b>${n}</b></div>`;
+      }).join("");
+      document.getElementById("statusStack").innerHTML = parts.map(([label, n, color]) =>
+        `<span data-status="${label}" style="width:${(n / total) * 100}%;background:${color}" title="${label}"></span>`).join("");
+      document.getElementById("statusLegend").innerHTML = parts.map(([label, n, color]) =>
+        `<button type="button" data-status="${label}" class="${state.status === label ? "active" : ""}"><b style="background:${color}"></b>${label} (${n})</button>`).join("");
+      document.querySelectorAll("[data-status]").forEach((el) => {
+        el.addEventListener("click", () => {
+          state.status = el.dataset.status;
+          syncControls();
+        });
+      });
+    }
+
+    function renderMix() {
+      const planned = state.tickets.filter((t) => t.work_type === "Planned");
+      const adhoc = state.tickets.filter((t) => t.work_type === "Ad hoc");
+      const rows = [
+        ["Planned points", sum(planned, (t) => t.story_points), "planned", "Planned"],
+        ["Ad hoc points", sum(adhoc, (t) => t.story_points), "adhoc", "Ad hoc"],
+        ["Planned tickets", planned.length, "planned", "Planned"],
+        ["Ad hoc tickets", adhoc.length, "adhoc", "Ad hoc"],
+      ];
+      const maxPts = Math.max(rows[0][1], rows[1][1], 1);
+      const maxTix = Math.max(rows[2][1], rows[3][1], 1);
+      document.getElementById("mixBars").innerHTML = rows.map(([label, n, cls, work], i) => {
+        const max = i < 2 ? maxPts : maxTix;
+        const active = state.work === work ? "active" : "";
+        return `<div class="bar-row ${active}" data-work="${work}"><span>${label}</span><div class="track"><i class="${cls}" style="width:${(n / max) * 100}%"></i></div><b>${fmt(n)}</b></div>`;
+      }).join("");
+      const share = rows[0][1] + rows[1][1] || 1;
+      const adhocShare = Math.round((rows[1][1] / share) * 100);
+      document.getElementById("mixCallout").innerHTML =
+        `<strong>Summary:</strong> Ad hoc is ~${adhocShare}% of points. Click Planned or Ad hoc bars to filter the queue.`;
+      document.querySelectorAll("[data-work]").forEach((el) => {
+        el.addEventListener("click", () => {
+          state.work = state.work === el.dataset.work ? "All" : el.dataset.work;
+          syncControls();
+        });
+      });
+    }
+
+    function renderTeams() {
+      const teams = [...new Set(state.tickets.map((t) => t.team))].sort();
+      const pts = teams.map((team) => ({
+        team,
+        points: sum(state.tickets.filter((t) => t.team === team), (t) => t.story_points),
+        tickets: state.tickets.filter((t) => t.team === team).length,
+      })).sort((a, b) => b.points - a.points);
+      const maxP = Math.max(...pts.map((p) => p.points), 1);
+      document.getElementById("teamBars").innerHTML = pts.map((p) => {
+        const active = state.team === p.team ? "active" : "";
+        return `<div class="bar-row ${active}" data-team="${p.team}">
+          <span>${p.team}</span>
+          <div class="track"><i style="width:${(p.points / maxP) * 100}%"></i></div>
+          <b>${fmt(p.points)}pt · ${p.tickets}t</b>
+        </div>`;
+      }).join("");
+
+      const teamSelect = document.getElementById("teamFilter");
+      const current = state.team;
+      teamSelect.innerHTML = `<option value="All">All</option>` + teams.map((t) => `<option value="${t}">${t}</option>`).join("");
+      teamSelect.value = current;
+
+      document.querySelectorAll("[data-team]").forEach((el) => {
+        el.addEventListener("click", () => {
+          state.team = state.team === el.dataset.team ? "All" : el.dataset.team;
+          syncControls();
+        });
+      });
+    }
+
+    function renderQueue() {
+      const rows = sorted(filtered());
+      document.getElementById("queueHint").textContent =
+        `${rows.length} ticket(s) in view` +
+        (state.sprint ? ` · ${state.sprint}` : "") +
+        (state.priority ? ` · ${state.priority}` : "") +
+        `. Click a row for full decision card.`;
+      const body = document.getElementById("queueBody");
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">No tickets match. Reset filters or broaden search.</td></tr>`;
+        return;
+      }
+      body.innerHTML = rows.map((t) => `
+        <tr class="row ${state.selectedId === t.id ? "selected" : ""}" data-id="${t.id}">
+          <td class="mono">${t.id}<div class="muted">${t.sprint} · ${t.work_type}</div></td>
+          <td>${escapeHtml(t.title)}<div class="muted">${t.issue_type} · ${t.category}</div></td>
+          <td>${t.team}</td>
+          <td><span class="pill ${statusTone(t.status)}">${t.status}</span></td>
+          <td><span class="pill ${t.priority === "P1" ? "danger" : t.priority === "P2" ? "warn" : ""}">${t.priority}</span></td>
+          <td>${t.story_points}</td>
+          <td>${t.age_days}d</td>
+          <td class="triage">
+            <strong>Epic:</strong> ${t.epic}<br/>
+            <strong>Assign:</strong> ${t.suggested_assignee}<br/>
+            <strong>Due:</strong> ${t.due_date}<br/>
+            ${escapeHtml(t.suggested_comment)}
+            ${t.has_email === "no" ? '<div style="margin-top:4px"><span class="pill danger">missing email</span></div>' : ""}
+          </td>
+        </tr>`).join("");
+      body.querySelectorAll("tr.row").forEach((tr) => {
+        tr.addEventListener("click", () => openDrawer(tr.dataset.id));
+      });
+    }
+
+    function statusTone(s) {
+      if (s === "Closed") return "ok";
+      if (s === "Blocked") return "blocked";
+      if (s === "In progress") return "warn";
+      return "danger";
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function openDrawer(id) {
+      const t = state.tickets.find((x) => x.id === id);
+      if (!t) return;
+      state.selectedId = id;
+      document.getElementById("drawerEyebrow").textContent = `${t.priority} · ${t.status} · ${t.work_type}`;
+      document.getElementById("drawerTitle").textContent = t.title;
+      document.getElementById("drawerMeta").innerHTML =
+        `<span class="mono">${t.id}</span> · ${t.team} · ${t.sprint} · ${t.age_days}d old` +
+        (t.url ? ` · <a href="${t.url}" target="_blank" rel="noopener">Open in Jira</a>` : "");
+      document.getElementById("drawerDecide").innerHTML = `
+        <p class="muted" style="margin:0 0 8px">Use this checklist on the ticket:</p>
+        <ol style="margin:0;padding-left:18px;font-size:13px;line-height:1.55">
+          <li><strong>Epic:</strong> ${escapeHtml(t.epic)}</li>
+          <li><strong>Points:</strong> ${t.story_points} (1pt ≈ 8h, floor 0.25)</li>
+          <li><strong>Assigned:</strong> ${escapeHtml(t.suggested_assignee)}</li>
+          <li><strong>Due:</strong> ${t.due_date} <span class="muted">(or sprint-end Monday / quarter end)</span></li>
+          <li><strong>Comment:</strong> paste below</li>
+        </ol>`;
+      document.getElementById("drawerComment").textContent = t.suggested_comment;
+      document.getElementById("btnCopyComment").onclick = async () => {
+        await navigator.clipboard.writeText(t.suggested_comment);
+        toast("Comment copied");
+      };
+      document.getElementById("drawer").classList.add("open");
+      document.getElementById("drawer").setAttribute("aria-hidden", "false");
+      renderQueue();
+    }
+
+    function closeDrawer() {
+      document.getElementById("drawer").classList.remove("open");
+      document.getElementById("drawer").setAttribute("aria-hidden", "true");
+    }
+
+    function syncControls() {
+      document.getElementById("statusFilter").value = state.status;
+      document.getElementById("teamFilter").value = state.team;
+      document.getElementById("workFilter").value = state.work;
+      document.getElementById("query").value = state.query;
+      renderAll();
+    }
+
+    function renderAll() {
+      renderBrief();
+      renderKpis();
+      renderSprintTrend();
+      renderStatus();
+      renderMix();
+      renderTeams();
+      renderQueue();
+    }
+
+    function resetFilters() {
+      state.status = "active";
+      state.team = "All";
+      state.work = "All";
+      state.sprint = null;
+      state.priority = null;
+      state.unassignedOnly = false;
+      state.missingEmailOnly = false;
+      state.query = "";
+      state.selectedId = null;
+      syncControls();
+      toast("Filters reset");
+    }
+
+    function setBanner() {
+      const el = document.getElementById("dataBanner");
+      if (state.source === "demo") {
+        el.className = "banner";
+        el.innerHTML = `<strong>Demo data.</strong> Interactive summary on fictional tickets. Run <code>npm run sync</code> (or <code>sync:dry</code>) then Reload snapshot to use morning analysis output.`;
+      } else {
+        el.className = "banner live";
+        el.innerHTML = `<strong>Live snapshot.</strong> Source: <code>${escapeHtml(state.source)}</code> · Generated: <code>${escapeHtml(state.generatedAt || "—")}</code> · ${state.tickets.length} tickets. Keep PII off git.`;
+      }
+    }
+
+    async function loadSnapshot() {
+      try {
+        const res = await fetch(`data/jira_snapshot.json?ts=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error("no snapshot");
+        const data = await res.json();
+        if (!Array.isArray(data.tickets) || !data.tickets.length) throw new Error("empty");
+        state.tickets = data.tickets.map(enrich);
+        state.source = data.source || "jira_snapshot";
+        state.generatedAt = data.generatedAt || null;
+        setBanner();
+        renderAll();
+        toast(`Loaded ${state.tickets.length} tickets from snapshot`);
+      } catch {
+        state.tickets = DEMO_TICKETS.map(enrich);
+        state.source = "demo";
+        state.generatedAt = null;
+        setBanner();
+        renderAll();
+        toast("Using demo data (no snapshot yet)");
+      }
+    }
+
+    document.getElementById("statusFilter").addEventListener("change", (e) => { state.status = e.target.value; renderAll(); });
+    document.getElementById("teamFilter").addEventListener("change", (e) => { state.team = e.target.value; renderAll(); });
+    document.getElementById("workFilter").addEventListener("change", (e) => { state.work = e.target.value; renderAll(); });
+    document.getElementById("query").addEventListener("input", (e) => { state.query = e.target.value; renderAll(); });
+    document.getElementById("btnReset").addEventListener("click", resetFilters);
+    document.getElementById("btnRefresh").addEventListener("click", loadSnapshot);
+    document.getElementById("drawerClose").addEventListener("click", closeDrawer);
+    document.getElementById("drawer").addEventListener("click", (e) => { if (e.target.id === "drawer") closeDrawer(); });
+    document.getElementById("btnFocusBlocked").addEventListener("click", () => { state.status = "Blocked"; state.priority = null; state.unassignedOnly = false; state.missingEmailOnly = false; syncControls(); toast("Focused blocked"); });
+    document.getElementById("btnFocusP1").addEventListener("click", () => { state.status = "active"; state.priority = "P1"; state.unassignedOnly = false; state.missingEmailOnly = false; syncControls(); toast("Focused P1"); });
+    document.getElementById("btnFocusUnassigned").addEventListener("click", () => { state.status = "active"; state.unassignedOnly = true; state.missingEmailOnly = false; state.priority = null; syncControls(); toast("Focused unassigned"); });
+    document.getElementById("btnFocusMissingEmail").addEventListener("click", () => { state.status = "active"; state.missingEmailOnly = true; state.unassignedOnly = false; state.priority = null; syncControls(); toast("Focused missing email"); });
+    document.getElementById("btnCopyBrief").addEventListener("click", async () => {
+      const { plain } = buildBriefText(filtered());
+      await navigator.clipboard.writeText(plain);
+      toast("Brief copied");
+    });
+    document.getElementById("btnSummarize").addEventListener("click", () => {
+      document.getElementById("morningBrief").scrollIntoView({ behavior: "smooth", block: "start" });
+      renderBrief();
+      toast("Summary updated for current filters");
+    });
+    document.querySelectorAll("th[data-sort]").forEach((th) => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.sort;
+        if (state.sortKey === key) state.sortDir *= -1;
+        else { state.sortKey = key; state.sortDir = key === "age_days" || key === "story_points" ? -1 : 1; }
+        renderQueue();
+      });
+    });
+
+    /* ---- Settings / Datasource / Actions (local Jane API) ---- */
+    const api = {
+      async get(path) {
+        const res = await fetch(path, { cache: "no-store" });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      },
+      async post(path, body) {
+        const res = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body || {}),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        return data;
+      },
+    };
+
+    function setActionLog(msg, isError) {
+      const el = document.getElementById("actionLog");
+      el.textContent = msg;
+      el.style.color = isError ? "var(--danger)" : "var(--muted)";
+    }
+
+    async function refreshDatasourcePanel() {
+      const list = document.getElementById("datasourceList");
+      const snap = document.getElementById("datasourceSnap");
+      try {
+        const data = await api.get("/api/datasource");
+        list.innerHTML = (data.datasources || []).map((d) => `
+          <div class="source-row">
+            <div>
+              <div class="name"><span class="dot ${d.connected ? "on" : "off"}"></span>${escapeHtml(d.label)}</div>
+              <div class="detail">${escapeHtml(d.detail || "")}${d.enabled === false && d.id === "google" ? " · disabled for auto" : ""}</div>
+            </div>
+            <span class="pill ${d.connected ? "ok" : ""}">${d.connected ? "Ready" : "Setup"}</span>
+          </div>`).join("");
+        if (data.snapshot) {
+          const s = data.snapshot;
+          snap.innerHTML = `<strong>Last sync:</strong> ${escapeHtml(s.source)} · ${s.count} tickets · ${escapeHtml(s.generatedAt || "—")}` +
+            (s.summary ? `<br/>Open ${s.summary.open} · Blocked ${s.summary.blocked} · Active pts ${s.summary.activePoints}` : "");
+        } else {
+          snap.textContent = "No snapshot yet — run Sync Jira / Google / Demo from Actions.";
+        }
+      } catch {
+        list.innerHTML = `<div class="muted">Local Jane API offline. From this folder run <code>npm start</code> (port 5500), then refresh. Settings need that server to save secrets safely.</div>`;
+        snap.textContent = "Start npm start to enable Settings + Actions.";
+      }
+    }
+
+    function openSettings() {
+      document.getElementById("settingsModal").classList.add("open");
+      document.getElementById("settingsModal").setAttribute("aria-hidden", "false");
+      loadSettingsForm();
+    }
+    function closeSettings() {
+      document.getElementById("settingsModal").classList.remove("open");
+      document.getElementById("settingsModal").setAttribute("aria-hidden", "true");
+    }
+
+    async function loadSettingsForm() {
+      const statusEl = document.getElementById("settingsStatus");
+      try {
+        const data = await api.get("/api/settings");
+        const j = data.settings.jira;
+        const g = data.settings.google;
+        const s = data.settings.schedule;
+        document.getElementById("jiraBaseUrl").value = j.baseUrl || "";
+        document.getElementById("jiraEmail").value = j.email || "";
+        document.getElementById("jiraToken").value = j.tokenSet ? "••••••••" : "";
+        document.getElementById("jiraToken").placeholder = j.tokenSet ? "saved — leave blank to keep" : "paste token";
+        document.getElementById("jiraJql").value = j.jql || "";
+        document.getElementById("jiraMax").value = j.maxResults || 200;
+        document.getElementById("jiraPointsField").value = j.fieldStoryPoints || "";
+        document.getElementById("jiraSprintField").value = j.fieldSprint || "";
+        document.getElementById("jiraTeamField").value = j.fieldTeam || "";
+        document.getElementById("jiraWriteComments").checked = Boolean(j.writeComments);
+        document.getElementById("googleKey").value = g.keySet ? "••••••••" : "";
+        document.getElementById("googleKey").placeholder = g.keySet ? "saved — leave blank to keep" : "AIza…";
+        document.getElementById("googleSheetId").value = g.spreadsheetId || "";
+        document.getElementById("googleRange").value = g.range || "Tickets!A:P";
+        document.getElementById("googleEnabled").checked = Boolean(g.enabled);
+        document.getElementById("schedTz").value = s.timezone || "America/New_York";
+        document.getElementById("schedHour").value = s.hour ?? 9;
+        const st = data.status;
+        statusEl.innerHTML =
+          `Jira: <strong>${st.jira.configured ? "connected" : "not set"}</strong>` +
+          (st.jira.baseUrl ? ` (${escapeHtml(st.jira.baseUrl)})` : "") +
+          ` · Google: <strong>${st.google.configured ? "connected" : "not set"}</strong>` +
+          ` · Saved: <code>${escapeHtml(st.updatedAt || "never")}</code>`;
+      } catch (err) {
+        statusEl.textContent = "Cannot reach local API. Run npm start in projects/service-field-operations/";
+      }
+    }
+
+    async function saveSettings() {
+      const body = {
+        jira: {
+          baseUrl: document.getElementById("jiraBaseUrl").value.trim(),
+          email: document.getElementById("jiraEmail").value.trim(),
+          apiToken: document.getElementById("jiraToken").value,
+          jql: document.getElementById("jiraJql").value.trim(),
+          maxResults: Number(document.getElementById("jiraMax").value || 200),
+          fieldStoryPoints: document.getElementById("jiraPointsField").value.trim(),
+          fieldSprint: document.getElementById("jiraSprintField").value.trim(),
+          fieldTeam: document.getElementById("jiraTeamField").value.trim(),
+          writeComments: document.getElementById("jiraWriteComments").checked,
+        },
+        google: {
+          apiKey: document.getElementById("googleKey").value,
+          spreadsheetId: document.getElementById("googleSheetId").value.trim(),
+          range: document.getElementById("googleRange").value.trim() || "Tickets!A:P",
+          enabled: document.getElementById("googleEnabled").checked,
+        },
+        schedule: {
+          timezone: document.getElementById("schedTz").value.trim() || "America/New_York",
+          hour: Number(document.getElementById("schedHour").value || 9),
+          minute: 0,
+        },
+      };
+      try {
+        const res = await api.post("/api/settings", body);
+        toast(res.message || "Settings saved");
+        await loadSettingsForm();
+        await refreshDatasourcePanel();
+        setActionLog("Settings saved. Use Actions → Sync Jira / Google to pull data.");
+      } catch (err) {
+        toast(err.message || "Save failed");
+        setActionLog(err.message || "Save failed", true);
+      }
+    }
+
+    async function runAction(kind) {
+      setActionLog(`Running ${kind}…`);
+      try {
+        if (kind === "reload") {
+          await loadSnapshot();
+          await refreshDatasourcePanel();
+          setActionLog("Dashboard reloaded from snapshot.");
+          return;
+        }
+        if (kind === "sync-demo") {
+          const res = await api.post("/api/actions/sync", { source: "demo", dryRun: true });
+          setActionLog(`Demo loaded · ${res.count} tickets`);
+          await loadSnapshot();
+          await refreshDatasourcePanel();
+          toast("Demo datasource loaded");
+          return;
+        }
+        if (kind === "sync-jira") {
+          const res = await api.post("/api/actions/sync", { source: "jira" });
+          setActionLog(`Jira sync OK · ${res.count} tickets · ${res.generatedAt}`);
+          await loadSnapshot();
+          await refreshDatasourcePanel();
+          toast("Jira synced");
+          return;
+        }
+        if (kind === "sync-google") {
+          const res = await api.post("/api/actions/sync", { source: "google" });
+          setActionLog(`Google sync OK · ${res.count} tickets · ${res.generatedAt}`);
+          await loadSnapshot();
+          await refreshDatasourcePanel();
+          toast("Google Sheets synced");
+          return;
+        }
+        if (kind === "test-jira" || kind === "test-google") {
+          const target = kind === "test-jira" ? "jira" : "google";
+          const res = await api.post("/api/actions/test", { target });
+          setActionLog(res.message || "OK");
+          await loadSnapshot();
+          await refreshDatasourcePanel();
+          toast(res.message || "Test OK");
+        }
+      } catch (err) {
+        setActionLog(err.message || String(err), true);
+        toast(err.message || "Action failed");
+      }
+    }
+
+    document.getElementById("btnOpenSettings").addEventListener("click", openSettings);
+    document.getElementById("btnCloseSettings").addEventListener("click", closeSettings);
+    document.getElementById("settingsModal").addEventListener("click", (e) => {
+      if (e.target.id === "settingsModal") closeSettings();
+    });
+    document.getElementById("btnSaveSettings").addEventListener("click", saveSettings);
+    document.getElementById("btnClearJira").addEventListener("click", async () => {
+      try {
+        await api.post("/api/settings/clear", { target: "jira" });
+        toast("Jira token cleared");
+        loadSettingsForm();
+        refreshDatasourcePanel();
+      } catch (err) { toast(err.message); }
+    });
+    document.getElementById("btnClearGoogle").addEventListener("click", async () => {
+      try {
+        await api.post("/api/settings/clear", { target: "google" });
+        toast("Google key cleared");
+        loadSettingsForm();
+        refreshDatasourcePanel();
+      } catch (err) { toast(err.message); }
+    });
+    document.querySelectorAll(".tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+        tab.classList.add("active");
+        document.getElementById(`tab-${tab.dataset.tab}`).classList.add("active");
+      });
+    });
+    document.getElementById("btnOpenDatasource").addEventListener("click", () => {
+      document.getElementById("datasourcePanel").scrollIntoView({ behavior: "smooth", block: "start" });
+      refreshDatasourcePanel();
+    });
+    document.getElementById("btnOpenActions").addEventListener("click", () => {
+      document.getElementById("actionsPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    document.querySelectorAll("[data-action]").forEach((btn) => {
+      btn.addEventListener("click", () => runAction(btn.dataset.action));
+    });
+
+    setBanner();
+    loadSnapshot();
+    refreshDatasourcePanel();
+  </script>
+</body>
+</html>
